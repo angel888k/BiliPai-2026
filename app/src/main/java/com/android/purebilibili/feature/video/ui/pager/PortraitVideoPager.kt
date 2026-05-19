@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -101,6 +102,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.android.purebilibili.core.network.NetworkModule
+import com.android.purebilibili.core.store.DanmakuSettings
+import com.android.purebilibili.core.store.DanmakuSettingsScope
 import com.android.purebilibili.core.store.PlaybackCompletionBehavior
 import com.android.purebilibili.core.store.SettingsManager
 import com.android.purebilibili.core.store.TokenManager
@@ -204,14 +207,17 @@ fun PortraitVideoPager(
     val entryStartPositionMs = remember(initialBvid) { initialStartPositionMs.coerceAtLeast(0L) }
     val scope = rememberCoroutineScope()
     val danmakuManager = rememberDanmakuManager()
-    val danmakuScope = com.android.purebilibili.core.store.DanmakuSettingsScope.PORTRAIT
-    val danmakuSettings by SettingsManager
-        .getDanmakuSettings(context, danmakuScope)
-        .collectAsState(
-            initial = com.android.purebilibili.core.store.DanmakuSettings(),
-            context = kotlin.coroutines.EmptyCoroutineContext
-        )
-    val danmakuEnabled = danmakuSettings.enabled
+    val danmakuScope = DanmakuSettingsScope.PORTRAIT
+    val loadedDanmakuSettings by produceState<DanmakuSettings?>(
+        initialValue = null,
+        context,
+        danmakuScope
+    ) {
+        SettingsManager.getDanmakuSettings(context, danmakuScope).collect { value = it }
+    }
+    val danmakuSettingsLoaded = loadedDanmakuSettings != null
+    val danmakuSettings = loadedDanmakuSettings ?: DanmakuSettings()
+    val danmakuEnabled = danmakuSettingsLoaded && danmakuSettings.enabled
     val danmakuOpacity = danmakuSettings.opacity
     val danmakuFontScale = danmakuSettings.fontScale
     val effectiveDanmakuFontScale = resolvePortraitDanmakuReadableFontScale(danmakuFontScale)
@@ -853,8 +859,8 @@ fun PortraitVideoPager(
             }
     }
 
-    LaunchedEffect(currentPlayingCid, currentPlayingAid, danmakuEnabled, exoPlayer) {
-        if (currentPlayingCid > 0 && danmakuEnabled) {
+    LaunchedEffect(currentPlayingCid, currentPlayingAid, danmakuEnabled, danmakuSettingsLoaded, exoPlayer) {
+        if (shouldLoadPortraitDanmaku(danmakuSettingsLoaded, currentPlayingCid, danmakuEnabled)) {
             danmakuManager.isEnabled = true
             var durationMs = exoPlayer.duration
             var retries = 0
@@ -882,8 +888,10 @@ fun PortraitVideoPager(
         danmakuAllowColorful,
         danmakuAllowSpecial,
         danmakuBlockRules,
-        danmakuSmartOcclusion
+        danmakuSmartOcclusion,
+        danmakuSettingsLoaded
     ) {
+        if (!danmakuSettingsLoaded) return@LaunchedEffect
         danmakuManager.updateSettings(
             opacity = danmakuOpacity,
             fontScale = effectiveDanmakuFontScale,
@@ -2335,6 +2343,14 @@ internal fun shouldInsetPortraitDanmakuFromStatusBar(
     surfaceMode: PortraitDanmakuSurfaceMode
 ): Boolean {
     return surfaceMode == PortraitDanmakuSurfaceMode.Page
+}
+
+internal fun shouldLoadPortraitDanmaku(
+    settingsLoaded: Boolean,
+    cid: Long,
+    danmakuEnabled: Boolean
+): Boolean {
+    return settingsLoaded && cid > 0L && danmakuEnabled
 }
 
 internal fun resolvePortraitDanmakuReadableFontScale(fontScale: Float): Float {

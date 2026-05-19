@@ -224,6 +224,38 @@ class PortraitVideoPagerPolicyTest {
     }
 
     @Test
+    fun portraitDanmakuLoad_waitsForSettingsBeforeLoading() {
+        assertFalse(
+            shouldLoadPortraitDanmaku(
+                settingsLoaded = false,
+                cid = 123L,
+                danmakuEnabled = true
+            )
+        )
+        assertTrue(
+            shouldLoadPortraitDanmaku(
+                settingsLoaded = true,
+                cid = 123L,
+                danmakuEnabled = true
+            )
+        )
+        assertFalse(
+            shouldLoadPortraitDanmaku(
+                settingsLoaded = true,
+                cid = 0L,
+                danmakuEnabled = true
+            )
+        )
+        assertFalse(
+            shouldLoadPortraitDanmaku(
+                settingsLoaded = true,
+                cid = 123L,
+                danmakuEnabled = false
+            )
+        )
+    }
+
+    @Test
     fun pageDanmakuSurface_isInsetFromStatusBar() {
         assertTrue(
             shouldInsetPortraitDanmakuFromStatusBar(PortraitDanmakuSurfaceMode.Page)
