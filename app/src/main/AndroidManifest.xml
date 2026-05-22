@@ -30,6 +30,11 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <queries>
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.tencent.mobileqq" />
+    </queries>
+
     <application
         android:name=".app.PureApplication"
         android:allowBackup="true"

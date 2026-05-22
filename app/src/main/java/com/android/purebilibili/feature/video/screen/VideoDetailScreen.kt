@@ -192,7 +192,6 @@ import com.android.purebilibili.core.ui.blur.unifiedBlur
 import com.android.purebilibili.core.ui.IOSModalBottomSheet
 import com.android.purebilibili.core.util.CardPositionManager
 import com.android.purebilibili.core.util.FormatUtils
-import com.android.purebilibili.core.util.ShareUtils
 import coil.compose.AsyncImage
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -211,6 +210,9 @@ import com.android.purebilibili.feature.video.ui.feedback.resolveQualityReminder
 import com.android.purebilibili.feature.video.ui.feedback.resolveTripleCelebrationPlacement
 import com.android.purebilibili.feature.video.ui.feedback.resolveVideoFeedbackPlacement
 import com.android.purebilibili.feature.video.ui.section.resolveForcedReturnCoverSharedElementSourceRoute
+import com.android.purebilibili.feature.video.share.VideoSharePayload
+import com.android.purebilibili.feature.video.share.VideoShareSheet
+import com.android.purebilibili.feature.video.share.buildVideoSharePayload
 import com.android.purebilibili.feature.video.viewmodel.PlayerToastMessage
 import com.android.purebilibili.feature.video.viewmodel.PlayerToastPresentation
 import kotlin.math.abs
@@ -1370,6 +1372,7 @@ fun VideoDetailScreen(
     )
     val externalPlaylistQueueTitle = resolveExternalPlaylistQueueTitle(externalPlaylistSource)
     var showExternalPlaylistQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var pendingVideoShare by remember { mutableStateOf<VideoSharePayload?>(null) }
     val externalPlaylistQueueSheetPresentation = remember {
         resolveExternalPlaylistQueueSheetPresentation(requireRealtimeHaze = true)
     }
@@ -3338,8 +3341,7 @@ fun VideoDetailScreen(
                                                         onDownloadClick = { viewModel.openDownloadDialog() },
                                                         onWatchLaterClick = { viewModel.toggleWatchLater() },
                                                         onShareClick = {
-                                                            ShareUtils.shareVideo(
-                                                                context = context,
+                                                            pendingVideoShare = buildVideoSharePayload(
                                                                 title = success.info.title,
                                                                 bvid = success.info.bvid
                                                             )
@@ -3423,14 +3425,10 @@ fun VideoDetailScreen(
                                                             },
                                                             onCoinClick = { viewModel.openCoinDialog() },
                                                             onShareClick = {
-                                                                val shareText = "【${success.info.title}】\nhttps://www.bilibili.com/video/${success.info.bvid}"
-                                                                val sendIntent = android.content.Intent().apply {
-                                                                    action = android.content.Intent.ACTION_SEND
-                                                                    putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                                                    type = "text/plain"
-                                                                }
-                                                                val shareIntent = android.content.Intent.createChooser(sendIntent, "分享视频到")
-                                                                context.startActivity(shareIntent)
+                                                                pendingVideoShare = buildVideoSharePayload(
+                                                                    title = success.info.title,
+                                                                    bvid = success.info.bvid
+                                                                )
                                                             },
                                                             onCommentClick = {
                                                                 android.util.Log.d("VideoDetailScreen", "📝 Comment input clicked!")
@@ -3768,6 +3766,13 @@ fun VideoDetailScreen(
                 }
             }
         )
+
+        pendingVideoShare?.let { payload ->
+            VideoShareSheet(
+                payload = payload,
+                onDismiss = { pendingVideoShare = null }
+            )
+        }
         
         VideoDetailPlaybackEndedDialog(
             viewModel = viewModel,
