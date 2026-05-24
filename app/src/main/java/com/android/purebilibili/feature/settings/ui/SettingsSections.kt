@@ -299,6 +299,11 @@ internal fun SettingsRootCategoryContent(
 ) {
     Column {
         when (category) {
+            SettingsRootCategory.SOCIAL_SUPPORT -> FollowAuthorSection(
+                onTelegramClick = actions.onTelegramClick,
+                onTwitterClick = actions.onTwitterClick,
+                onDonateClick = actions.onDonateClick
+            )
             SettingsRootCategory.INTERFACE_THEME -> SettingsSceneShortcutSection(
                 shortcuts = listOf(
                     SettingsSceneShortcut(
@@ -421,18 +426,6 @@ internal fun SettingsRootCategoryContent(
                 )
             }
             SettingsRootCategory.ABOUT_SUPPORT -> {
-                ReleaseChannelPinnedCard(
-                    onGithubClick = actions.onGithubClick,
-                    onTelegramClick = actions.onTelegramClick,
-                    onDisclaimerClick = actions.onDisclaimerClick
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                FollowAuthorSection(
-                    onTelegramClick = actions.onTelegramClick,
-                    onTwitterClick = actions.onTwitterClick,
-                    onDonateClick = actions.onDonateClick
-                )
-                Spacer(modifier = Modifier.height(12.dp))
                 AboutSection(
                     versionName = state.versionName,
                     easterEggEnabled = state.easterEggEnabled,
@@ -459,6 +452,12 @@ internal fun SettingsRootCategoryContent(
                     buildFingerprintSubtitle = state.buildFingerprintSubtitle,
                     versionClickCount = state.versionClickCount,
                     versionClickThreshold = state.versionClickThreshold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ReleaseChannelPinnedCard(
+                    onGithubClick = actions.onGithubClick,
+                    onTelegramClick = actions.onTelegramClick,
+                    onDisclaimerClick = actions.onDisclaimerClick
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 SupportToolsSection(
