@@ -462,6 +462,22 @@ internal fun resolveRequestedStartPositionMs(
     return fallbackResumePositionMs.coerceAtLeast(0L)
 }
 
+internal fun resolvePageSwitchStartPositionMs(
+    cachedPositionMs: Long,
+    pageDurationSeconds: Long,
+    ignoreSavedProgress: Boolean,
+    endedRestartThresholdMs: Long = 5_000L
+): Long {
+    if (ignoreSavedProgress) return 0L
+    val safeCachedPositionMs = cachedPositionMs.coerceAtLeast(0L)
+    val durationMs = pageDurationSeconds.coerceAtLeast(0L) * 1000L
+    val restartBoundaryMs = (durationMs - endedRestartThresholdMs.coerceAtLeast(0L)).coerceAtLeast(0L)
+    if (durationMs > 0L && safeCachedPositionMs >= restartBoundaryMs) {
+        return 0L
+    }
+    return safeCachedPositionMs
+}
+
 internal fun resolveInitialPlaybackQualityMode(): PlaybackQualityMode = PlaybackQualityMode.AUTO
 
 internal fun resolvePlaybackQualityModeForQualitySelection(qualityId: Int): PlaybackQualityMode {
@@ -2145,25 +2161,11 @@ class PlayerViewModel : ViewModel() {
     }
 
     private fun hasNextPageOrRecommended(): Boolean {
-        val nextStrategy = resolveAudioNextPlaybackStrategy(
-            isExternalPlaylist = PlaylistManager.isExternalPlaylist.value,
-            externalPlaylistSource = PlaylistManager.externalPlaylistSource.value
-        )
-        if (nextStrategy == AudioNextPlaybackStrategy.PLAY_EXTERNAL_PLAYLIST) {
-            return hasNextInPlaylist(loopAtEnd = false)
-        }
         val (hasNextPage, hasNextSeasonEpisode, hasNextPlaylistItem) = resolveCurrentNextAvailability()
         return hasNextPage || hasNextSeasonEpisode || hasNextPlaylistItem
     }
 
     private fun hasPreviousPageOrRecommended(): Boolean {
-        val previousStrategy = resolveAudioNextPlaybackStrategy(
-            isExternalPlaylist = PlaylistManager.isExternalPlaylist.value,
-            externalPlaylistSource = PlaylistManager.externalPlaylistSource.value
-        )
-        if (previousStrategy == AudioNextPlaybackStrategy.PLAY_EXTERNAL_PLAYLIST) {
-            return hasPreviousInPlaylist()
-        }
         val (hasPreviousPage, hasPreviousSeasonEpisode, hasPreviousPlaylistItem) =
             resolveCurrentPreviousAvailability()
         return hasPreviousPage || hasPreviousSeasonEpisode || hasPreviousPlaylistItem
@@ -5715,11 +5717,11 @@ class PlayerViewModel : ViewModel() {
                         isHevcSupported = isHevcSupported,
                         isAv1Supported = isAv1Supported
                     )
-                    val restoredPosition = if (ignoreSavedProgress) {
-                        0L
-                    } else {
-                        playbackUseCase.getCachedPosition(currentBvid, page.cid)
-                    }
+                    val restoredPosition = resolvePageSwitchStartPositionMs(
+                        cachedPositionMs = playbackUseCase.getCachedPosition(currentBvid, page.cid),
+                        pageDurationSeconds = page.duration,
+                        ignoreSavedProgress = ignoreSavedProgress
+                    )
                     
                     if (selection != null) {
                         val cdnSelection = resolvePlaybackCdnCandidateSelection(
