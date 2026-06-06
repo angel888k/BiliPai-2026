@@ -1106,39 +1106,11 @@ internal fun Modifier.kernelSuMiuixFloatingDockSurface(
     materialPressProgress: Float = 0f
 ): Modifier = composed {
     val isDarkTheme = isSystemInDarkTheme()
-    val materialSpec: BottomBarGlassMaterialSpec = resolveBottomBarGlassMaterialSpec(
-        preset = liquidGlassPreset,
-        isDarkTheme = isDarkTheme,
-        isScrolling = isScrolling,
-        scrollProgress = materialScrollProgress,
-        glassEnabled = glassEnabled,
-        motionProgress = materialMotionProgress,
-        pressProgress = materialPressProgress
-    )
     val useHazeBlur = shouldUseAndroidNativeFloatingHazeBlur(
         glassEnabled = glassEnabled,
         blurEnabled = blurEnabled,
         hasHazeState = hazeState != null
     )
-    val innerRimGlowProvider: () -> MiuixInnerShadow? = remember(
-        materialSpec.innerRimGlow,
-        isDarkTheme,
-        glassEnabled
-    ) {
-        val innerRimGlow = materialSpec.innerRimGlow
-        if (glassEnabled && innerRimGlow != null) {
-            val cached = MiuixInnerShadow(
-                radius = innerRimGlow.radiusDp.dp,
-                alpha = innerRimGlow.alpha,
-                color = if (isDarkTheme) Color.White else Color.Black
-            )
-            val provider: () -> MiuixInnerShadow? = { cached }
-            provider
-        } else {
-            val provider: () -> MiuixInnerShadow? = { null }
-            provider
-        }
-    }
     val baseHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 
     this
@@ -1172,23 +1144,18 @@ internal fun Modifier.kernelSuMiuixFloatingDockSurface(
                         backdrop = backdrop,
                         shape = { shape },
                         effects = {
-                            if (glassEnabled || (blurEnabled && !useHazeBlur)) {
-                                if (materialSpec.vibrancy) {
-                                    miuixVibrancy()
-                                }
-                                val radiusPx = (materialSpec.blurRadiusDp?.dp ?: blurRadius).toPx()
-                                miuixBlur(radiusPx, radiusPx)
-                                if (
-                                    glassEnabled &&
-                                    drawShellLens &&
-                                    materialSpec.shellRefractionHeightDp > 0f &&
-                                    materialSpec.shellRefractionAmountDp > 0f
-                                ) {
+                            if (glassEnabled) {
+                                miuixVibrancy()
+                                miuixBlur(4.dp.toPx(), 4.dp.toPx())
+                                if (drawShellLens) {
                                     miuixLens(
-                                        refractionHeight = materialSpec.shellRefractionHeightDp.dp.toPx(),
-                                        refractionAmount = materialSpec.shellRefractionAmountDp.dp.toPx()
+                                        refractionHeight = 24.dp.toPx(),
+                                        refractionAmount = 24.dp.toPx()
                                     )
                                 }
+                            } else if (blurEnabled && !useHazeBlur) {
+                                val radiusPx = blurRadius.toPx()
+                                miuixBlur(radiusPx, radiusPx)
                             }
                         },
                         highlight = {
@@ -1204,12 +1171,8 @@ internal fun Modifier.kernelSuMiuixFloatingDockSurface(
                         } else null,
                         onDrawSurface = {
                             drawRect(containerColor)
-                            if (materialSpec.foregroundTint.alpha > 0f) {
-                                drawRect(materialSpec.foregroundTint)
-                            }
                         }
                     )
-                    .miuixInnerShadow(shape = shape, shadow = innerRimGlowProvider)
             } else {
                 background(containerColor, shape)
             }
@@ -1325,8 +1288,7 @@ internal fun resolveAndroidNativeIdleIndicatorSurfaceColor(
     darkTheme: Boolean
 ): Color {
     return if (darkTheme) {
-        // BiliPai 的组合采样层比 KSU 更亮，降低白色叠层避免深色主题下形成实心灰块。
-        Color.White.copy(alpha = 0.06f)
+        Color.White.copy(alpha = 0.1f)
     } else {
         Color.Black.copy(alpha = 0.1f)
     }
@@ -2937,6 +2899,11 @@ private fun KernelSuAlignedBottomBar(
 ) {
     val shellShape = resolveSharedBottomBarCapsuleShape()
     val tabsBackdrop = rememberMiuixLayerBackdrop()
+    val ksuContainerColor = if (glassEnabled) {
+        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f)
+    } else {
+        containerColor
+    }
     val density = LocalDensity.current
     val bottomBarMotionSpec = remember {
         resolveBottomBarMotionSpec(profile = BottomBarMotionProfile.ANDROID_NATIVE_FLOATING)
@@ -3037,15 +3004,6 @@ private fun KernelSuAlignedBottomBar(
             easing = AppMotionEasing.Continuity
         ),
         label = "bottomBarMaterialScrollProgress"
-    )
-    val materialSpec: BottomBarGlassMaterialSpec = resolveBottomBarGlassMaterialSpec(
-        preset = liquidGlassPreset,
-        isDarkTheme = isDarkTheme,
-        isScrolling = isFeedScrollInProgress,
-        scrollProgress = materialScrollProgress,
-        glassEnabled = glassEnabled,
-        motionProgress = motionProgress,
-        pressProgress = effectivePressProgress
     )
     var searchExpansionOverride by remember {
         mutableStateOf(BottomBarSearchExpansionOverride.FOLLOW_AUTO)
@@ -3243,8 +3201,6 @@ private fun KernelSuAlignedBottomBar(
                 effectiveIndicatorProgress,
                 effectivePressProgress
             )
-            val shellCaptureRefractionHeightDp = materialSpec.shellRefractionHeightDp
-            val shellCaptureRefractionAmountDp = materialSpec.shellRefractionAmountDp
             val indicatorLensSpec = resolveBottomBarBackdropPresetIndicatorLens(
                 progress = effectivePressProgress
             )
@@ -3292,21 +3248,8 @@ private fun KernelSuAlignedBottomBar(
             val shouldRenderIndicatorContentCapture =
                 shouldComposeDockContent &&
                     (shouldRenderRefractionCapture || isBottomBarPressActive)
-            // [P0] 捕获层预热：捕获层刚挂载时 tabsBackdrop 尚未完成 layerBackdrop 录制，
-            // 若指示器立即采样它会得到空内容 —— 表现为点击切换瞬间选中图标/文字消失、露出背景层。
-            // 等待约 2 帧让录制就绪后,再允许指示器使用该 backdrop。
-            var captureWarm by remember { mutableStateOf(false) }
-            LaunchedEffect(shouldRenderIndicatorContentCapture) {
-                if (!shouldRenderIndicatorContentCapture) {
-                    captureWarm = false
-                } else {
-                    withFrameNanos {}
-                    withFrameNanos {}
-                    captureWarm = true
-                }
-            }
             val contentBackdrop = if (
-                shouldRenderIndicatorBackdrop && captureWarm && miuixBackdrop != null
+                shouldRenderIndicatorBackdrop && miuixBackdrop != null
             ) {
                 rememberMiuixCombinedBackdrop(miuixBackdrop, tabsBackdrop)
             } else {
@@ -3343,9 +3286,7 @@ private fun KernelSuAlignedBottomBar(
                     themeWeight = coverage,
                     glassEnabled = glassEnabled,
                     indicatorProgress = effectiveIndicatorEffectProgress,
-                    // 仅在指示器确实采样到已录制的捕获层后才把可见层置灰,
-                    // 避免预热窗口内可见图标被置灰、而指示器又是空采样导致整体消失。
-                    indicatorBackdropEnabled = shouldRenderIndicatorBackdrop && captureWarm
+                    indicatorBackdropEnabled = shouldRenderIndicatorBackdrop
                 )
             }
 
@@ -3416,7 +3357,7 @@ private fun KernelSuAlignedBottomBar(
                         .height(dockHeight),
                     shellShape = shellShape,
                     miuixBackdrop = miuixBackdrop,
-                    containerColor = containerColor,
+                    containerColor = ksuContainerColor,
                     blurEnabled = blurEnabled,
                     glassEnabled = glassEnabled,
                     blurRadius = tuning.shellBlurRadiusDp.dp,
@@ -3502,20 +3443,11 @@ private fun KernelSuAlignedBottomBar(
                 }
 
                 if (shouldRenderIndicatorContentCapture && miuixBackdrop != null) {
-                    // 对齐 KSU LiquidBottomTabs：tabsBackdrop 录制整条可见栏的同一个胶囊。
-                    // BiliPai 的搜索是独立可见胶囊，但折射参考层必须覆盖 dock + gap + search，
-                    // 否则 dock 右端帽会落在末项透镜采样范围内，提前折射成“第二个右边缘”。
-                    val rawCaptureWidth = resolveBottomBarRefractionCaptureWidth(
-                        dockWidth = dockWidth,
-                        launchAdjustedSearchGap = launchAdjustedSearchGap,
-                        searchWidth = searchWidth,
-                        searchEnabled = searchEnabled
-                    )
-                    val captureWidth = rawCaptureWidth
                     Box(
                         modifier = Modifier
-                            .width(captureWidth)
-                            .height(shellHeight)
+                            .width(dockWidth)
+                            .height(56.dp)
+                            .align(Alignment.CenterStart)
                             .clearAndSetSemantics {}
                             .alpha(0f)
                             .miuixLayerBackdrop(tabsBackdrop)
@@ -3526,119 +3458,72 @@ private fun KernelSuAlignedBottomBar(
                                 backdrop = miuixBackdrop,
                                 shape = { shellShape },
                                 effects = {
-                                    if (materialSpec.vibrancy) {
-                                        miuixVibrancy()
-                                    }
-                                    val radiusPx = (
-                                        materialSpec.blurRadiusDp
-                                            ?: tuning.shellBlurRadiusDp
-                                        ).dp.toPx()
-                                    miuixBlur(radiusPx, radiusPx)
-                                    if (
-                                        shellCaptureRefractionHeightDp > 0f &&
-                                        shellCaptureRefractionAmountDp > 0f
-                                    ) {
-                                        miuixLens(
-                                            refractionHeight = shellCaptureRefractionHeightDp.dp.toPx(),
-                                            refractionAmount = shellCaptureRefractionAmountDp.dp.toPx()
-                                        )
-                                    }
+                                    miuixVibrancy()
+                                    miuixBlur(4.dp.toPx(), 4.dp.toPx())
+                                    miuixLens(
+                                        refractionHeight = 24.dp.toPx(),
+                                        refractionAmount = 24.dp.toPx()
+                                    )
                                 },
                                 onDrawSurface = {
-                                    drawRect(containerColor)
+                                    drawRect(ksuContainerColor)
                                 }
                             )
                             // 对齐 KSU：隐藏采样层保持中性色内容，再由整层 tint 统一染成主题色。
                             .graphicsLayer(colorFilter = ColorFilter.tint(exportTintColor))
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .width(dockWidth)
-                                .height(dockHeight)
-                                .align(Alignment.CenterStart)
+                                .fillMaxSize()
+                                .padding(horizontal = dockHorizontalPadding),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            BottomBarSkinDecorativeTrim(
-                                decoration = uiSkinDecoration,
-                                modifier = Modifier.matchParentSize(),
-                                clipShape = shellShape
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(dockContentPadding),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                visibleItems.forEachIndexed { index, item ->
-                                    val coverage = itemCoverage(index)
-                                    val contentColor = exportItemContentColor(item, coverage)
-                                    AndroidNativeBottomBarItem(
-                                        item = item,
-                                        itemWidth = indicatorWidth,
-                                        label = resolveBottomNavItemLabel(item),
-                                        dynamicUnreadCount = 0,
-                                        selected = true,
-                                        showIcon = showIcon,
-                                        showText = showText,
-                                        selectedColor = contentColor,
-                                        unselectedColor = contentColor,
-                                        contentColorOverride = contentColor,
-                                        iconStyle = iconStyle,
-                                        skinIconPath = uiSkinDecoration?.iconPathFor(item, selected = true),
-                                        labelScrimColor = skinContentColors.labelScrimColor,
-                                        labelScrimAlpha = skinContentColors.labelScrimAlpha,
-                                        onClick = {},
-                                        interactive = false,
-                                        selectedIconAlpha = 1f,
-                                        scale = sampledItemScale()
-                                    )
-                                }
-
-                                if (isTablet && onToggleSidebar != null) {
-                                    val coverage = itemCoverage(visibleItems.size)
-                                    val contentColor = exportItemContentColor(null, coverage)
-                                    AndroidNativeBottomBarItem(
-                                        item = null,
-                                        itemWidth = indicatorWidth,
-                                        label = stringResource(R.string.sidebar_toggle),
-                                        dynamicUnreadCount = 0,
-                                        selected = true,
-                                        showIcon = showIcon,
-                                        showText = showText,
-                                        selectedColor = contentColor,
-                                        unselectedColor = contentColor,
-                                        contentColorOverride = contentColor,
-                                        iconStyle = iconStyle,
-                                        labelScrimColor = skinContentColors.labelScrimColor,
-                                        labelScrimAlpha = skinContentColors.labelScrimAlpha,
-                                        onClick = {},
-                                        interactive = false,
-                                        selectedIconAlpha = 1f,
-                                        scale = sampledItemScale()
-                                    )
-                                }
+                            visibleItems.forEachIndexed { index, item ->
+                                val coverage = itemCoverage(index)
+                                val contentColor = exportItemContentColor(item, coverage)
+                                AndroidNativeBottomBarItem(
+                                    item = item,
+                                    itemWidth = indicatorWidth,
+                                    label = resolveBottomNavItemLabel(item),
+                                    dynamicUnreadCount = 0,
+                                    selected = true,
+                                    showIcon = showIcon,
+                                    showText = showText,
+                                    selectedColor = contentColor,
+                                    unselectedColor = contentColor,
+                                    contentColorOverride = contentColor,
+                                    iconStyle = iconStyle,
+                                    skinIconPath = uiSkinDecoration?.iconPathFor(item, selected = true),
+                                    labelScrimColor = skinContentColors.labelScrimColor,
+                                    labelScrimAlpha = skinContentColors.labelScrimAlpha,
+                                    onClick = {},
+                                    interactive = false,
+                                    selectedIconAlpha = 1f,
+                                    scale = sampledItemScale()
+                                )
                             }
-                        }
 
-                        if (searchEnabled) {
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = dockWidth + launchAdjustedSearchGap)
-                                    .width(searchWidth)
-                                    .height(searchHeight)
-                                    .align(Alignment.CenterStart),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                KernelSuBottomBarSearchVisualContent(
-                                    expanded = effectiveSearchExpanded,
-                                    query = searchQuery,
-                                    onQueryChange = {},
-                                    onSubmit = {},
-                                    contentColor = unselectedColor,
-                                    accentColor = selectedColor,
-                                    iconScale = if (effectiveSearchExpanded) 0.92f else 1f,
-                                    fieldAlpha = if (effectiveSearchExpanded) 1f else 0f,
-                                    interactive = false
+                            if (isTablet && onToggleSidebar != null) {
+                                val coverage = itemCoverage(visibleItems.size)
+                                val contentColor = exportItemContentColor(null, coverage)
+                                AndroidNativeBottomBarItem(
+                                    item = null,
+                                    itemWidth = indicatorWidth,
+                                    label = stringResource(R.string.sidebar_toggle),
+                                    dynamicUnreadCount = 0,
+                                    selected = true,
+                                    showIcon = showIcon,
+                                    showText = showText,
+                                    selectedColor = contentColor,
+                                    unselectedColor = contentColor,
+                                    contentColorOverride = contentColor,
+                                    iconStyle = iconStyle,
+                                    labelScrimColor = skinContentColors.labelScrimColor,
+                                    labelScrimAlpha = skinContentColors.labelScrimAlpha,
+                                    onClick = {},
+                                    interactive = false,
+                                    selectedIconAlpha = 1f,
+                                    scale = sampledItemScale()
                                 )
                             }
                         }
@@ -3770,7 +3655,7 @@ private fun KernelSuAlignedBottomBar(
                     },
                     shape = shellShape,
                     miuixBackdrop = miuixBackdrop,
-                    containerColor = containerColor,
+                    containerColor = ksuContainerColor,
                     blurEnabled = blurEnabled,
                     glassEnabled = glassEnabled,
                     blurRadius = tuning.shellBlurRadiusDp.dp,

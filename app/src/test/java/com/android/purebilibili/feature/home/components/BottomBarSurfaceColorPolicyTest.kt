@@ -463,7 +463,7 @@ class BottomBarSurfaceColorPolicyTest {
     }
 
     @Test
-    fun `android native idle glass indicator uses softened neutral overlay in dark mode`() {
+    fun `android native idle glass indicator uses ksu neutral overlay in dark mode`() {
         val idleIndicator = resolveAndroidNativeIdleIndicatorSurfaceColor(
             darkTheme = true
         )
@@ -471,7 +471,7 @@ class BottomBarSurfaceColorPolicyTest {
         assertEquals(Color.White.red, idleIndicator.red, 0.001f)
         assertEquals(Color.White.green, idleIndicator.green, 0.001f)
         assertEquals(Color.White.blue, idleIndicator.blue, 0.001f)
-        assertEquals(0.06f, idleIndicator.alpha, 0.003f)
+        assertEquals(0.1f, idleIndicator.alpha, 0.003f)
     }
 
     @Test
