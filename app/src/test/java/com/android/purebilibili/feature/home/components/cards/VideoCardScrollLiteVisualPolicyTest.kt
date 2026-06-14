@@ -106,7 +106,7 @@ class VideoCardScrollLiteVisualPolicyTest {
         assertTrue(
             "首页视频封面本体必须裁剪 coverShape，不能只依赖 sharedBounds 的 overlay 裁剪。",
             source.contains(
-                ".aspectRatio(VIDEO_SHARED_COVER_ASPECT_RATIO)\n" +
+                ".aspectRatio(coverAspectRatio)\n" +
                     "                .clip(coverShape)"
             )
         )

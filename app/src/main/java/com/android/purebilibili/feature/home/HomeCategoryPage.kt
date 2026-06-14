@@ -35,6 +35,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.purebilibili.core.store.SettingsManager
+import com.android.purebilibili.core.store.HomeDurationStyle
+import com.android.purebilibili.core.store.HomeFeedCardStyle
 import com.android.purebilibili.core.store.HomeWallpaperEffectMode
 import com.android.purebilibili.core.ui.animation.DissolveAnimationPreset
 import com.android.purebilibili.core.ui.animation.DissolvableVideoCard
@@ -125,7 +127,8 @@ internal fun HomeCategoryPageContent(
     wallpaperTintEnabled: Boolean = false,
     wallpaperEffectMode: HomeWallpaperEffectMode = HomeWallpaperEffectMode.SOFT_BLUR,
     showUpBadges: Boolean = true,
-    showDurationBadges: Boolean = true,
+    homeDurationStyle: HomeDurationStyle = HomeDurationStyle.OUTSIDE_COVER,
+    homeFeedCardStyle: HomeFeedCardStyle = HomeFeedCardStyle.CURRENT,
     oldContentAnchorBvid: String? = null,
     oldContentStartIndex: Int? = null,
     todayWatchEnabled: Boolean = false,
@@ -156,6 +159,9 @@ internal fun HomeCategoryPageContent(
     uiSkinDecoration: HomeUiSkinDecoration? = null,
     modifier: Modifier = Modifier,
 ) {
+    val cardLayout = remember(homeFeedCardStyle) {
+        resolveHomeFeedCardLayout(homeFeedCardStyle)
+    }
     val scrollLiteModeEnabled by remember(gridState) {
         derivedStateOf { gridState.isScrollInProgress }
     }
@@ -207,8 +213,8 @@ internal fun HomeCategoryPageContent(
             state = gridState,
             columns = GridCells.Fixed(gridColumns),
             contentPadding = contentPadding,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(cardLayout.itemSpacingDp.dp),
+            verticalArrangement = Arrangement.spacedBy(cardLayout.itemSpacingDp.dp),
             modifier = Modifier.fillMaxSize()
         ) {
         if (category == HomeCategory.LIVE) {
@@ -364,7 +370,9 @@ internal fun HomeCategoryPageContent(
                                         showCoverGlassBadges = showCoverGlassBadges,
                                         showInfoGlassBadges = showInfoGlassBadges,
                                         showUpBadge = showUpBadges,
-                                        showDurationBadge = showDurationBadges,
+                                        homeDurationStyle = homeDurationStyle,
+                                        coverAspectRatio = cardLayout.coverAspectRatio,
+                                        cardHorizontalPadding = cardLayout.storyCardHorizontalPaddingDp.dp,
                                         showOnlineCount = showOnlineCount,
                                         onUpClick = onUpClick,
                                         showPublishTime = true,
@@ -405,7 +413,8 @@ internal fun HomeCategoryPageContent(
                                         wallpaperTintEnabled = wallpaperTintEnabled,
                                         wallpaperEffectMode = wallpaperEffectMode,
                                         showUpBadge = showUpBadges,
-                                        showDurationBadge = showDurationBadges,
+                                        homeDurationStyle = homeDurationStyle,
+                                        coverAspectRatio = cardLayout.coverAspectRatio,
                                         showOnlineCount = showOnlineCount,
                                         onUpClick = onUpClick,
                                         onDismiss = { onDismissVideo(video) },
@@ -484,7 +493,7 @@ private fun PopularSubCategorySegmentedControl(
         containerHorizontalPadding = 3.dp,
         containerVerticalPadding = 3.dp,
         liquidGlassEffectsEnabled = true,
-        dragSelectionEnabled = true,
+        dragSelectionEnabled = false,
         preferInlineContentStyle = true
     )
 }

@@ -379,6 +379,27 @@ enum class HomeFeedCardWidthPreset(
     }
 }
 
+enum class HomeFeedCardStyle(val value: Int, val label: String) {
+    CURRENT(0, "当前样式"),
+    OFFICIAL(1, "官方样式");
+
+    companion object {
+        fun fromValue(value: Int): HomeFeedCardStyle =
+            entries.find { it.value == value } ?: CURRENT
+    }
+}
+
+enum class HomeDurationStyle(val value: Int, val label: String) {
+    OUTSIDE_COVER(0, "封面外"),
+    OVERLAY_TEXT_ONLY(1, "封面内无底色"),
+    HIDDEN(2, "隐藏");
+
+    companion object {
+        fun fromValue(value: Int): HomeDurationStyle =
+            entries.find { it.value == value } ?: OUTSIDE_COVER
+    }
+}
+
 data class HomeSettings(
     val displayMode: Int = 0,              // 展示模式 (0=网格, 1=故事卡片)
     val isBottomBarFloating: Boolean = true,
@@ -407,6 +428,7 @@ data class HomeSettings(
     val isHeaderCollapseEnabled: Boolean = true,
     val gridColumnCount: Int = 0, // [New] 网格列数 (0=自动, 1-6=固定)
     val homeFeedCardWidthPreset: HomeFeedCardWidthPreset = HomeFeedCardWidthPreset.AUTO,
+    val homeFeedCardStyle: HomeFeedCardStyle = HomeFeedCardStyle.CURRENT,
     val cardAnimationEnabled: Boolean = false,    //  卡片进场动画（默认关闭）
     val cardTransitionEnabled: Boolean = true,    //  卡片过渡动画（默认开启）
     val videoTransitionRealtimeBlurEnabled: Boolean = true, // 视频转场实时模糊（默认开启）
@@ -418,7 +440,7 @@ data class HomeSettings(
     val homeWallpaperEffectMode: HomeWallpaperEffectMode = HomeWallpaperEffectMode.SOFT_BLUR,
     val homeWallpaperEffectScope: HomeWallpaperEffectScope = HomeWallpaperEffectScope.HOME_ONLY,
     val showHomeUpBadges: Boolean = true, // 首页和相关推荐 UP 主标识显示
-    val showHomeVideoDurationBadges: Boolean = true, // 首页视频封面时长显示
+    val homeDurationStyle: HomeDurationStyle = HomeDurationStyle.OUTSIDE_COVER,
     val easterEggEnabled: Boolean = false, // 下拉刷新趣味提示开关
     //  [修复] 默认值改为 true，避免在 Flow 加载实际值之前错误触发弹窗
     // 当 Flow 加载完成后，如果实际值是 false，LaunchedEffect 会再次触发并显示弹窗
@@ -436,6 +458,7 @@ data class AppThemeSettings(
     val appLanguage: AppLanguage = AppLanguage.FOLLOW_SYSTEM,
     val md3ColorSource: Md3ColorSource = Md3ColorSource.FOLLOW_WALLPAPER,
     val md3CustomColorHex: String = "#007AFF",
+    val themeRoleOverrides: ThemeRoleOverrides = ThemeRoleOverrides(),
     val colorStyle: PaletteStyle = PaletteStyle.TonalSpot,
     val colorSpec: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2021,
     val themeColorIndex: Int = 0,
@@ -448,6 +471,29 @@ data class AppThemeSettings(
         AppScreenshotGestureMode.TOP_RIGHT_TWO_FINGER_LONG_PRESS,
     val appScreenshotCaptureMode: AppScreenshotCaptureMode =
         AppScreenshotCaptureMode.FULL_WINDOW
+)
+
+data class ThemeModeRoleOverrides(
+    val backgroundHex: String,
+    val primaryTextHex: String,
+    val secondaryTextHex: String,
+    val controlAccentHex: String
+)
+
+data class ThemeRoleOverrides(
+    val enabled: Boolean = false,
+    val light: ThemeModeRoleOverrides = ThemeModeRoleOverrides(
+        backgroundHex = "#FFFDF8",
+        primaryTextHex = "#1C1B1F",
+        secondaryTextHex = "#49454F",
+        controlAccentHex = "#0061A4"
+    ),
+    val dark: ThemeModeRoleOverrides = ThemeModeRoleOverrides(
+        backgroundHex = "#121212",
+        primaryTextHex = "#E6E1E5",
+        secondaryTextHex = "#CAC4D0",
+        controlAccentHex = "#9ECAFF"
+    )
 )
 
 enum class BottomBarSearchAutoExpandMode(val value: Int, val label: String) {
@@ -857,6 +903,16 @@ object SettingsManager {
     private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     private val KEY_MD3_COLOR_SOURCE = stringPreferencesKey("md3_color_source")
     private val KEY_MD3_CUSTOM_COLOR_HEX = stringPreferencesKey("md3_custom_color_hex")
+    private val KEY_THEME_ROLE_OVERRIDES_ENABLED =
+        booleanPreferencesKey("theme_role_overrides_enabled")
+    private val KEY_THEME_LIGHT_BACKGROUND = stringPreferencesKey("theme_light_background")
+    private val KEY_THEME_LIGHT_PRIMARY_TEXT = stringPreferencesKey("theme_light_primary_text")
+    private val KEY_THEME_LIGHT_SECONDARY_TEXT = stringPreferencesKey("theme_light_secondary_text")
+    private val KEY_THEME_LIGHT_CONTROL_ACCENT = stringPreferencesKey("theme_light_control_accent")
+    private val KEY_THEME_DARK_BACKGROUND = stringPreferencesKey("theme_dark_background")
+    private val KEY_THEME_DARK_PRIMARY_TEXT = stringPreferencesKey("theme_dark_primary_text")
+    private val KEY_THEME_DARK_SECONDARY_TEXT = stringPreferencesKey("theme_dark_secondary_text")
+    private val KEY_THEME_DARK_CONTROL_ACCENT = stringPreferencesKey("theme_dark_control_accent")
     private val KEY_THEME_COLOR_STYLE = stringPreferencesKey("theme_color_style")
     private val KEY_THEME_COLOR_SPEC = stringPreferencesKey("theme_color_spec")
     private val KEY_BG_PLAY = booleanPreferencesKey("bg_play")
@@ -991,6 +1047,7 @@ object SettingsManager {
     private val KEY_GRID_COLUMN_COUNT = intPreferencesKey("grid_column_count")
     private val KEY_HOME_FEED_CARD_WIDTH_PRESET =
         intPreferencesKey("home_feed_card_width_preset")
+    private val KEY_HOME_FEED_CARD_STYLE = intPreferencesKey("home_feed_card_style")
     //  [新增] 卡片动画开关
     private val KEY_CARD_ANIMATION_ENABLED = booleanPreferencesKey("card_animation_enabled")
     //  [新增] 卡片过渡动画开关
@@ -1014,6 +1071,7 @@ object SettingsManager {
     private val KEY_HOME_UP_BADGES_VISIBLE = booleanPreferencesKey("home_up_badges_visible")
     private val KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE =
         booleanPreferencesKey("home_video_duration_badges_visible")
+    private val KEY_HOME_DURATION_STYLE = intPreferencesKey("home_duration_style")
     //  [合并] 崩溃追踪同意弹窗
     private val KEY_CRASH_TRACKING_CONSENT_SHOWN = booleanPreferencesKey("crash_tracking_consent_shown")
     private val KEY_LIQUID_GLASS_MODE = intPreferencesKey("liquid_glass_mode")
@@ -1112,6 +1170,9 @@ object SettingsManager {
             homeFeedCardWidthPreset = HomeFeedCardWidthPreset.fromValue(
                 preferences[KEY_HOME_FEED_CARD_WIDTH_PRESET] ?: HomeFeedCardWidthPreset.AUTO.value
             ),
+            homeFeedCardStyle = HomeFeedCardStyle.fromValue(
+                preferences[KEY_HOME_FEED_CARD_STYLE] ?: HomeFeedCardStyle.CURRENT.value
+            ),
             cardAnimationEnabled = preferences[KEY_CARD_ANIMATION_ENABLED] ?: false,
             cardTransitionEnabled = preferences[KEY_CARD_TRANSITION_ENABLED] ?: true,
             videoTransitionRealtimeBlurEnabled =
@@ -1129,7 +1190,13 @@ object SettingsManager {
                 preferences[KEY_HOME_WALLPAPER_EFFECT_SCOPE] ?: HomeWallpaperEffectScope.HOME_ONLY.value
             ),
             showHomeUpBadges = preferences[KEY_HOME_UP_BADGES_VISIBLE] ?: true,
-            showHomeVideoDurationBadges = preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] ?: true,
+            homeDurationStyle = preferences[KEY_HOME_DURATION_STYLE]
+                ?.let(HomeDurationStyle::fromValue)
+                ?: if (preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] ?: true) {
+                    HomeDurationStyle.OUTSIDE_COVER
+                } else {
+                    HomeDurationStyle.HIDDEN
+                },
             easterEggEnabled = preferences[KEY_EASTER_EGG_ENABLED] ?: false,
             // 保持现有运行时行为：首次未配置时按 false 返回
             crashTrackingConsentShown = preferences[KEY_CRASH_TRACKING_CONSENT_SHOWN] ?: false
@@ -1397,6 +1464,7 @@ object SettingsManager {
 
     internal fun mapAppThemeSettingsFromPreferences(preferences: Preferences): AppThemeSettings {
         val rawDpiOverride = preferences[KEY_APP_DPI_OVERRIDE_PERCENT] ?: 0
+        val defaultRoleOverrides = ThemeRoleOverrides()
         return AppThemeSettings(
             uiPreset = resolveUiPresetPreferenceValue(preferences[KEY_UI_PRESET]),
             androidNativeVariant = resolveAndroidNativeVariantPreferenceValue(
@@ -1415,6 +1483,45 @@ object SettingsManager {
                 legacyDynamicColorEnabled = preferences[KEY_DYNAMIC_COLOR]
             ),
             md3CustomColorHex = normalizeMd3CustomColorHex(preferences[KEY_MD3_CUSTOM_COLOR_HEX]),
+            themeRoleOverrides = ThemeRoleOverrides(
+                enabled = preferences[KEY_THEME_ROLE_OVERRIDES_ENABLED] ?: false,
+                light = ThemeModeRoleOverrides(
+                    backgroundHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_LIGHT_BACKGROUND],
+                        defaultRoleOverrides.light.backgroundHex
+                    ),
+                    primaryTextHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_LIGHT_PRIMARY_TEXT],
+                        defaultRoleOverrides.light.primaryTextHex
+                    ),
+                    secondaryTextHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_LIGHT_SECONDARY_TEXT],
+                        defaultRoleOverrides.light.secondaryTextHex
+                    ),
+                    controlAccentHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_LIGHT_CONTROL_ACCENT],
+                        defaultRoleOverrides.light.controlAccentHex
+                    )
+                ),
+                dark = ThemeModeRoleOverrides(
+                    backgroundHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_DARK_BACKGROUND],
+                        defaultRoleOverrides.dark.backgroundHex
+                    ),
+                    primaryTextHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_DARK_PRIMARY_TEXT],
+                        defaultRoleOverrides.dark.primaryTextHex
+                    ),
+                    secondaryTextHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_DARK_SECONDARY_TEXT],
+                        defaultRoleOverrides.dark.secondaryTextHex
+                    ),
+                    controlAccentHex = normalizeMd3CustomColorHex(
+                        preferences[KEY_THEME_DARK_CONTROL_ACCENT],
+                        defaultRoleOverrides.dark.controlAccentHex
+                    )
+                )
+            ),
             colorStyle = resolvePaletteStylePreference(preferences[KEY_THEME_COLOR_STYLE]),
             colorSpec = resolveColorSpecPreference(preferences[KEY_THEME_COLOR_SPEC]),
             themeColorIndex = normalizeThemeColorIndex(preferences[KEY_THEME_COLOR_INDEX] ?: 0),
@@ -1588,6 +1695,50 @@ object SettingsManager {
     suspend fun setMd3CustomColorHex(context: Context, hex: String) {
         context.settingsDataStore.edit { preferences ->
             preferences[KEY_MD3_CUSTOM_COLOR_HEX] = normalizeMd3CustomColorHex(hex)
+        }
+    }
+
+    fun getThemeRoleOverrides(context: Context): Flow<ThemeRoleOverrides> =
+        context.settingsDataStore.data.map { preferences ->
+            mapAppThemeSettingsFromPreferences(preferences).themeRoleOverrides
+        }
+
+    suspend fun setThemeRoleOverrides(context: Context, overrides: ThemeRoleOverrides) {
+        val defaults = ThemeRoleOverrides()
+        context.settingsDataStore.edit { preferences ->
+            preferences[KEY_THEME_ROLE_OVERRIDES_ENABLED] = overrides.enabled
+            preferences[KEY_THEME_LIGHT_BACKGROUND] = normalizeMd3CustomColorHex(
+                overrides.light.backgroundHex,
+                defaults.light.backgroundHex
+            )
+            preferences[KEY_THEME_LIGHT_PRIMARY_TEXT] = normalizeMd3CustomColorHex(
+                overrides.light.primaryTextHex,
+                defaults.light.primaryTextHex
+            )
+            preferences[KEY_THEME_LIGHT_SECONDARY_TEXT] = normalizeMd3CustomColorHex(
+                overrides.light.secondaryTextHex,
+                defaults.light.secondaryTextHex
+            )
+            preferences[KEY_THEME_LIGHT_CONTROL_ACCENT] = normalizeMd3CustomColorHex(
+                overrides.light.controlAccentHex,
+                defaults.light.controlAccentHex
+            )
+            preferences[KEY_THEME_DARK_BACKGROUND] = normalizeMd3CustomColorHex(
+                overrides.dark.backgroundHex,
+                defaults.dark.backgroundHex
+            )
+            preferences[KEY_THEME_DARK_PRIMARY_TEXT] = normalizeMd3CustomColorHex(
+                overrides.dark.primaryTextHex,
+                defaults.dark.primaryTextHex
+            )
+            preferences[KEY_THEME_DARK_SECONDARY_TEXT] = normalizeMd3CustomColorHex(
+                overrides.dark.secondaryTextHex,
+                defaults.dark.secondaryTextHex
+            )
+            preferences[KEY_THEME_DARK_CONTROL_ACCENT] = normalizeMd3CustomColorHex(
+                overrides.dark.controlAccentHex,
+                defaults.dark.controlAccentHex
+            )
         }
     }
 
@@ -1960,7 +2111,20 @@ object SettingsManager {
             preferences[KEY_HOME_FEED_CARD_WIDTH_PRESET] = preset.value
         }
     }
-    
+
+    fun getHomeFeedCardStyle(context: Context): Flow<HomeFeedCardStyle> =
+        context.settingsDataStore.data.map { preferences ->
+            HomeFeedCardStyle.fromValue(
+                preferences[KEY_HOME_FEED_CARD_STYLE] ?: HomeFeedCardStyle.CURRENT.value
+            )
+        }
+
+    suspend fun setHomeFeedCardStyle(context: Context, style: HomeFeedCardStyle) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[KEY_HOME_FEED_CARD_STYLE] = style.value
+        }
+    }
+
     //  [新增] --- 卡片进场动画开关 ---
     fun getCardAnimationEnabled(context: Context): Flow<Boolean> = context.settingsDataStore.data
         .map { preferences -> preferences[KEY_CARD_ANIMATION_ENABLED] ?: false }  // 默认关闭
@@ -2083,12 +2247,21 @@ object SettingsManager {
         }
     }
 
-    fun getHomeVideoDurationBadgesVisible(context: Context): Flow<Boolean> = context.settingsDataStore.data
-        .map { preferences -> preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] ?: true }
+    fun getHomeDurationStyle(context: Context): Flow<HomeDurationStyle> =
+        context.settingsDataStore.data.map { preferences ->
+            preferences[KEY_HOME_DURATION_STYLE]
+                ?.let(HomeDurationStyle::fromValue)
+                ?: if (preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] ?: true) {
+                    HomeDurationStyle.OUTSIDE_COVER
+                } else {
+                    HomeDurationStyle.HIDDEN
+                }
+        }
 
-    suspend fun setHomeVideoDurationBadgesVisible(context: Context, value: Boolean) {
+    suspend fun setHomeDurationStyle(context: Context, style: HomeDurationStyle) {
         context.settingsDataStore.edit { preferences ->
-            preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] = value
+            preferences[KEY_HOME_DURATION_STYLE] = style.value
+            preferences[KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE] = style != HomeDurationStyle.HIDDEN
         }
     }
 
@@ -5452,6 +5625,15 @@ object SettingsManager {
             BooleanShareablePreferenceDefinition(KEY_DYNAMIC_COLOR, SettingsShareSection.APPEARANCE),
             StringShareablePreferenceDefinition(KEY_MD3_COLOR_SOURCE, SettingsShareSection.APPEARANCE),
             StringShareablePreferenceDefinition(KEY_MD3_CUSTOM_COLOR_HEX, SettingsShareSection.APPEARANCE),
+            BooleanShareablePreferenceDefinition(KEY_THEME_ROLE_OVERRIDES_ENABLED, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_LIGHT_BACKGROUND, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_LIGHT_PRIMARY_TEXT, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_LIGHT_SECONDARY_TEXT, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_LIGHT_CONTROL_ACCENT, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_DARK_BACKGROUND, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_DARK_PRIMARY_TEXT, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_DARK_SECONDARY_TEXT, SettingsShareSection.APPEARANCE),
+            StringShareablePreferenceDefinition(KEY_THEME_DARK_CONTROL_ACCENT, SettingsShareSection.APPEARANCE),
             StringShareablePreferenceDefinition(KEY_THEME_COLOR_STYLE, SettingsShareSection.APPEARANCE),
             StringShareablePreferenceDefinition(KEY_THEME_COLOR_SPEC, SettingsShareSection.APPEARANCE),
             IntShareablePreferenceDefinition(KEY_THEME_COLOR_INDEX, SettingsShareSection.APPEARANCE),
@@ -5480,6 +5662,7 @@ object SettingsManager {
                 KEY_HOME_FEED_CARD_WIDTH_PRESET,
                 SettingsShareSection.APPEARANCE
             ),
+            IntShareablePreferenceDefinition(KEY_HOME_FEED_CARD_STYLE, SettingsShareSection.APPEARANCE),
             BooleanShareablePreferenceDefinition(KEY_CARD_ANIMATION_ENABLED, SettingsShareSection.APPEARANCE),
             BooleanShareablePreferenceDefinition(KEY_UI_ENTRANCE_ANIMATION_ENABLED, SettingsShareSection.APPEARANCE),
             BooleanShareablePreferenceDefinition(KEY_CARD_TRANSITION_ENABLED, SettingsShareSection.APPEARANCE),
@@ -5492,6 +5675,7 @@ object SettingsManager {
             IntShareablePreferenceDefinition(KEY_HOME_WALLPAPER_EFFECT_MODE, SettingsShareSection.APPEARANCE),
             BooleanShareablePreferenceDefinition(KEY_HOME_UP_BADGES_VISIBLE, SettingsShareSection.APPEARANCE),
             BooleanShareablePreferenceDefinition(KEY_HOME_VIDEO_DURATION_BADGES_VISIBLE, SettingsShareSection.APPEARANCE),
+            IntShareablePreferenceDefinition(KEY_HOME_DURATION_STYLE, SettingsShareSection.APPEARANCE),
 
             BooleanShareablePreferenceDefinition(KEY_AUTO_PLAY, SettingsShareSection.PLAYBACK),
             IntShareablePreferenceDefinition(KEY_PLAYBACK_COMPLETION_BEHAVIOR, SettingsShareSection.PLAYBACK),

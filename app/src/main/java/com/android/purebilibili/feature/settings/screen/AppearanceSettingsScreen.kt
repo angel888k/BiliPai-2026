@@ -42,9 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.purebilibili.R
 import com.android.purebilibili.core.store.BottomBarSearchAutoExpandMode
+import com.android.purebilibili.core.store.HomeDurationStyle
+import com.android.purebilibili.core.store.HomeFeedCardStyle
 import com.android.purebilibili.core.store.HomeWallpaperEffectMode
 import com.android.purebilibili.core.store.HomeWallpaperEffectScope
 import com.android.purebilibili.core.store.SettingsManager
+import com.android.purebilibili.core.store.ThemeModeRoleOverrides
+import com.android.purebilibili.core.store.ThemeRoleOverrides
 import coil.compose.AsyncImage
 import com.android.purebilibili.core.theme.deleteStoredAppFont
 import com.android.purebilibili.core.theme.importAppFontFromUri
@@ -418,15 +422,22 @@ fun AppearanceSettingsContent(
     val homeUpBadgesVisible by SettingsManager
         .getHomeUpBadgesVisible(context)
         .collectAsStateWithLifecycle(initialValue = true)
-    val homeVideoDurationBadgesVisible by SettingsManager
-        .getHomeVideoDurationBadgesVisible(context)
-        .collectAsStateWithLifecycle(initialValue = true)
+    val homeDurationStyle by SettingsManager
+        .getHomeDurationStyle(context)
+        .collectAsStateWithLifecycle(initialValue = HomeDurationStyle.OUTSIDE_COVER)
+    val homeFeedCardStyle by SettingsManager
+        .getHomeFeedCardStyle(context)
+        .collectAsStateWithLifecycle(initialValue = HomeFeedCardStyle.CURRENT)
+    val themeRoleOverrides by SettingsManager
+        .getThemeRoleOverrides(context)
+        .collectAsStateWithLifecycle(initialValue = ThemeRoleOverrides())
     val showOnlineCount by SettingsManager
         .getShowOnlineCount(context)
         .collectAsStateWithLifecycle(initialValue = false)
     val isLiquidGlassAvailable = shouldAllowHomeChromeLiquidGlass(Build.VERSION.SDK_INT)
     val showThemeColorPicker = state.md3ColorSource == Md3ColorSource.CUSTOM
     var showMd3ColorPickerDialog by remember { mutableStateOf(false) }
+    var roleColorTarget by remember { mutableStateOf<ThemeRoleColorTarget?>(null) }
     val md3ColorSourceOptions = remember { resolveMd3ColorSourceOptions() }
     val selectedMd3ColorSourceLabel = md3ColorSourceOptions
         .firstOrNull { it.value == state.md3ColorSource }
@@ -620,6 +631,34 @@ fun AppearanceSettingsContent(
                             onClick = { showMd3ColorPickerDialog = true },
                             iconTint = selectedCustomThemeColor
                         )
+
+                        IOSDivider()
+                        IOSSwitchItem(
+                            icon = rememberSettingsSemanticIcon(SettingsIconRole.ADVANCED_COLOR),
+                            title = "高级配色",
+                            subtitle = "分别覆盖明暗模式的背景、文字与控件色",
+                            checked = themeRoleOverrides.enabled,
+                            onCheckedChange = { enabled ->
+                                scope.launch {
+                                    SettingsManager.setThemeRoleOverrides(
+                                        context,
+                                        themeRoleOverrides.copy(enabled = enabled)
+                                    )
+                                }
+                            },
+                            iconTint = MaterialTheme.colorScheme.primary
+                        )
+
+                        AnimatedVisibility(
+                            visible = themeRoleOverrides.enabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            ThemeRoleOverrideEditor(
+                                overrides = themeRoleOverrides,
+                                onColorClick = { roleColorTarget = it }
+                            )
+                        }
 
                         IOSDivider()
 	                        ThemePresetDropdownSetting(
@@ -1361,22 +1400,35 @@ fun AppearanceSettingsContent(
                         )
 
                         IOSDivider(modifier = Modifier.padding(start = 16.dp))
-                        IOSSwitchItem(
-                            icon = rememberSettingsSemanticIcon(SettingsIconRole.VIDEO_DURATION_BADGES),
-                            title = "首页视频时长",
-                            subtitle = if (homeVideoDurationBadgesVisible) {
-                                "推荐视频封面右下角显示时长"
-                            } else {
-                                "隐藏推荐视频封面的时长，减少封面占用"
-                            },
-                            checked = homeVideoDurationBadgesVisible,
-                            onCheckedChange = {
-                                scope.launch {
-                                    SettingsManager.setHomeVideoDurationBadgesVisible(context, it)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            IOSSlidingSegmentedSetting(
+                                title = "首页卡片样式：${homeFeedCardStyle.label}",
+                                subtitle = "官方样式使用 16:9 封面与更紧凑的留白",
+                                options = HomeFeedCardStyle.entries.map {
+                                    PlaybackSegmentOption(it, it.label)
+                                },
+                                selectedValue = homeFeedCardStyle,
+                                onSelectionChange = {
+                                    scope.launch {
+                                        SettingsManager.setHomeFeedCardStyle(context, it)
+                                    }
                                 }
-                            },
-                            iconTint = com.android.purebilibili.core.theme.iOSGreen
-                        )
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            IOSSlidingSegmentedSetting(
+                                title = "首页视频时长：${homeDurationStyle.label}",
+                                subtitle = "可移到封面外、仅显示无底色文字或完全隐藏",
+                                options = HomeDurationStyle.entries.map {
+                                    PlaybackSegmentOption(it, it.label)
+                                },
+                                selectedValue = homeDurationStyle,
+                                onSelectionChange = {
+                                    scope.launch {
+                                        SettingsManager.setHomeDurationStyle(context, it)
+                                    }
+                                }
+                            )
+                        }
 
                         IOSDivider(modifier = Modifier.padding(start = 16.dp))
                         var showHomeWallpaperPicker by remember { mutableStateOf(false) }
@@ -1643,6 +1695,152 @@ fun AppearanceSettingsContent(
                 showMd3ColorPickerDialog = false
             }
         )
+    }
+
+    roleColorTarget?.let { target ->
+        Md3CustomColorPickerDialog(
+            initialHex = target.read(themeRoleOverrides),
+            onDismiss = { roleColorTarget = null },
+            onConfirm = { hex ->
+                scope.launch {
+                    SettingsManager.setThemeRoleOverrides(
+                        context,
+                        target.write(themeRoleOverrides, hex)
+                    )
+                }
+                roleColorTarget = null
+            }
+        )
+    }
+}
+
+private enum class ThemeRoleColorTarget(val label: String) {
+    LIGHT_BACKGROUND("浅色背景"),
+    LIGHT_PRIMARY_TEXT("浅色主要文字"),
+    LIGHT_SECONDARY_TEXT("浅色次要文字"),
+    LIGHT_CONTROL("浅色控件"),
+    DARK_BACKGROUND("深色背景"),
+    DARK_PRIMARY_TEXT("深色主要文字"),
+    DARK_SECONDARY_TEXT("深色次要文字"),
+    DARK_CONTROL("深色控件");
+
+    fun read(overrides: ThemeRoleOverrides): String = when (this) {
+        LIGHT_BACKGROUND -> overrides.light.backgroundHex
+        LIGHT_PRIMARY_TEXT -> overrides.light.primaryTextHex
+        LIGHT_SECONDARY_TEXT -> overrides.light.secondaryTextHex
+        LIGHT_CONTROL -> overrides.light.controlAccentHex
+        DARK_BACKGROUND -> overrides.dark.backgroundHex
+        DARK_PRIMARY_TEXT -> overrides.dark.primaryTextHex
+        DARK_SECONDARY_TEXT -> overrides.dark.secondaryTextHex
+        DARK_CONTROL -> overrides.dark.controlAccentHex
+    }
+
+    fun write(overrides: ThemeRoleOverrides, hex: String): ThemeRoleOverrides {
+        return when (this) {
+            LIGHT_BACKGROUND -> overrides.copy(light = overrides.light.copy(backgroundHex = hex))
+            LIGHT_PRIMARY_TEXT -> overrides.copy(light = overrides.light.copy(primaryTextHex = hex))
+            LIGHT_SECONDARY_TEXT -> overrides.copy(light = overrides.light.copy(secondaryTextHex = hex))
+            LIGHT_CONTROL -> overrides.copy(light = overrides.light.copy(controlAccentHex = hex))
+            DARK_BACKGROUND -> overrides.copy(dark = overrides.dark.copy(backgroundHex = hex))
+            DARK_PRIMARY_TEXT -> overrides.copy(dark = overrides.dark.copy(primaryTextHex = hex))
+            DARK_SECONDARY_TEXT -> overrides.copy(dark = overrides.dark.copy(secondaryTextHex = hex))
+            DARK_CONTROL -> overrides.copy(dark = overrides.dark.copy(controlAccentHex = hex))
+        }
+    }
+}
+
+@Composable
+private fun ThemeRoleOverrideEditor(
+    overrides: ThemeRoleOverrides,
+    onColorClick: (ThemeRoleColorTarget) -> Unit
+) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        ThemeRoleModeEditor(
+            title = "浅色模式",
+            roles = overrides.light,
+            targets = ThemeRoleColorTarget.entries.take(4),
+            onColorClick = onColorClick
+        )
+        IOSDivider()
+        ThemeRoleModeEditor(
+            title = "深色模式",
+            roles = overrides.dark,
+            targets = ThemeRoleColorTarget.entries.takeLast(4),
+            onColorClick = onColorClick
+        )
+    }
+}
+
+@Composable
+private fun ThemeRoleModeEditor(
+    title: String,
+    roles: ThemeModeRoleOverrides,
+    targets: List<ThemeRoleColorTarget>,
+    onColorClick: (ThemeRoleColorTarget) -> Unit
+) {
+    val warning = remember(roles) { hasThemeRoleContrastWarning(roles) }
+    val primaryContrast = remember(roles) {
+        themeRoleContrastRatio(roles.primaryTextHex, roles.backgroundHex)
+    }
+    val secondaryContrast = remember(roles) {
+        themeRoleContrastRatio(roles.secondaryTextHex, roles.backgroundHex)
+    }
+    val colors = listOf(
+        roles.backgroundHex,
+        roles.primaryTextHex,
+        roles.secondaryTextHex,
+        roles.controlAccentHex
+    )
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            colors.forEach { hex ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(parseMd3CustomColorHex(hex))
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(8.dp)
+                        )
+                )
+            }
+        }
+        targets.forEachIndexed { index, target ->
+            IOSClickableItem(
+                icon = rememberSettingsSemanticIcon(SettingsIconRole.DYNAMIC_COLOR),
+                title = target.label,
+                subtitle = colors[index],
+                value = colors[index],
+                onClick = { onColorClick(target) },
+                iconTint = parseMd3CustomColorHex(colors[index])
+            )
+        }
+        Text(
+            text = "对比度：主要文字 %.2f:1，次要文字 %.2f:1".format(
+                primaryContrast,
+                secondaryContrast
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        if (warning) {
+            Text(
+                text = "当前文字与背景对比度偏低，仍可按精确颜色保存。",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
     }
 }
 

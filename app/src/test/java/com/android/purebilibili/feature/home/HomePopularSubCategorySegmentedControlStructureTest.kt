@@ -15,14 +15,14 @@ class HomePopularSubCategorySegmentedControlStructureTest {
 
         assertTrue(source.contains("BottomBarLiquidSegmentedControl("))
         assertTrue(source.contains("PopularSubCategorySegmentedControl("))
-        assertTrue(source.contains("dragSelectionEnabled = true"))
+        assertTrue(source.contains("dragSelectionEnabled = false"))
         assertTrue(source.contains("liquidGlassEffectsEnabled = true"))
         assertTrue(source.contains("preferInlineContentStyle = true"))
         assertFalse(source.contains("PopularSubCategory.entries.forEach { subCategory ->\n                            FilterChip("))
     }
 
     @Test
-    fun `popular subcategory content switches through pager instead of clearing list`() {
+    fun `popular subcategory content switches by click without nested pager`() {
         val screenSource = loadSource(
             "app/src/main/java/com/android/purebilibili/feature/home/HomeScreen.kt"
         )
@@ -33,9 +33,8 @@ class HomePopularSubCategorySegmentedControlStructureTest {
             .substringAfter("fun switchPopularSubCategory")
             .substringBefore("//  [新增] 添加到稍后再看")
 
-        assertTrue(screenSource.contains("val popularPagerState = rememberPagerState("))
-        assertTrue(screenSource.contains("HorizontalPager(\n                                         state = popularPagerState"))
-        assertTrue(screenSource.contains(".getPopularCategoryState(subCategory)"))
+        assertFalse(screenSource.contains("val popularPagerState = rememberPagerState("))
+        assertTrue(screenSource.contains(".getPopularCategoryState(popularSubCategory)"))
         assertTrue(viewModelSource.contains("popularCategoryStates = PopularSubCategory.entries.associateWith"))
         assertTrue(viewModelSource.contains("private fun updatePopularCategoryState("))
         assertTrue(viewModelSource.contains("fun getPopularCategoryState(subCategory: PopularSubCategory)"))

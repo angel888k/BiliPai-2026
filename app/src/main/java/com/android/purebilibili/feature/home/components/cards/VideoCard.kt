@@ -44,6 +44,7 @@ import com.android.purebilibili.core.util.animateEnter
 import com.android.purebilibili.core.util.CardPositionManager
 import com.android.purebilibili.data.model.response.VideoItem
 import com.android.purebilibili.core.theme.BiliPink
+import com.android.purebilibili.core.store.HomeDurationStyle
 import com.android.purebilibili.core.theme.LocalCornerRadiusScale
 import com.android.purebilibili.core.theme.iOSCornerRadius
 import com.android.purebilibili.core.util.HapticType
@@ -63,7 +64,6 @@ import com.android.purebilibili.core.ui.adaptive.MotionTier
 import com.android.purebilibili.core.ui.components.UpBadgeName
 import com.android.purebilibili.core.ui.components.resolveUpStatsText
 import com.android.purebilibili.core.ui.transition.LocalVideoCardSharedElementSourceRoute
-import com.android.purebilibili.core.ui.transition.VIDEO_SHARED_COVER_ASPECT_RATIO
 import com.android.purebilibili.core.ui.transition.VideoSharedTransitionMotionSpec
 import com.android.purebilibili.core.ui.transition.VideoSharedTransitionVisualSpec
 import com.android.purebilibili.core.ui.transition.resolveVideoCardSharedTransitionMotionSpec
@@ -252,7 +252,8 @@ fun ElegantVideoCard(
     wallpaperTintEnabled: Boolean = false,
     wallpaperEffectMode: HomeWallpaperEffectMode = HomeWallpaperEffectMode.SOFT_BLUR,
     showUpBadge: Boolean = true,
-    showDurationBadge: Boolean = true,
+    homeDurationStyle: HomeDurationStyle = HomeDurationStyle.OUTSIDE_COVER,
+    coverAspectRatio: Float = 16f / 10f,
     showOnlineCount: Boolean = false,
     upFollowerCount: Int? = null,
     upVideoCount: Int? = null,
@@ -296,6 +297,8 @@ fun ElegantVideoCard(
     val primaryStatText = cardTexts.primaryStatText
     val secondaryStatText = cardTexts.secondaryStatText
     val durationBadgeMinWidth = cardTexts.durationBadgeMinWidth
+    val showDurationOnCover = homeDurationStyle == HomeDurationStyle.OVERLAY_TEXT_ONLY
+    val showDurationOutside = homeDurationStyle == HomeDurationStyle.OUTSIDE_COVER
     val inlinePillBaseColor = AppSurfaceTokens.cardContainer()
     val pillColors = remember(glassEnabled, blurEnabled, inlinePillBaseColor) {
         resolveVideoCardPillColors(
@@ -305,7 +308,6 @@ fun ElegantVideoCard(
         )
     }
     val coverPillColors = pillColors.cover
-    val emphasizedCoverPillColors = pillColors.emphasizedCover
     val inlinePillColors = pillColors.inline
     val isDarkCardTheme = AppSurfaceTokens.chromeBackground().luminance() < 0.5f
     val infoSurfaceAppearance = remember(wallpaperTintEnabled, wallpaperEffectMode, isDarkCardTheme, isDataSaverActive) {
@@ -586,7 +588,7 @@ fun ElegantVideoCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(VIDEO_SHARED_COVER_ASPECT_RATIO)
+                .aspectRatio(coverAspectRatio)
                 .clip(coverShape)
                 .onGloballyPositioned { coordinates ->
                     coverCoordsRef.value = coordinates
@@ -713,7 +715,7 @@ fun ElegantVideoCard(
                         primaryStatText,
                         secondaryStatText,
                         onlineCount,
-                        showDurationBadge,
+                        showDurationOnCover,
                         durationBadgeMinWidth
                     ) {
                         resolveVideoCardCompactCoverStatsLayout(
@@ -721,7 +723,7 @@ fun ElegantVideoCard(
                             primaryStatText = primaryStatText,
                             secondaryStatText = secondaryStatText,
                             hasOnlineCount = onlineCount.isNotEmpty(),
-                            durationBadgeMinWidthDp = if (showDurationBadge) {
+                            durationBadgeMinWidthDp = if (showDurationOnCover) {
                                 durationBadgeMinWidth.value
                             } else {
                                 0f
@@ -825,102 +827,37 @@ fun ElegantVideoCard(
                     }
 
                     //  时长标签 (与播放量/评论数同行对齐)
-                    if (showDurationBadge && badgeStylePolicy.coverStyle == HomeVideoBadgeStyle.GLASS) {
-                        Surface(
-                            modifier = Modifier.align(Alignment.BottomEnd),
-                            shape = RoundedCornerShape(smallCornerRadius),
-                            color = emphasizedCoverPillColors.containerColor,
-                            border = BorderStroke(0.8.dp, emphasizedCoverPillColors.borderColor)
-                        ) {
-                            Text(
-                                text = durationText,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                softWrap = false,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .widthIn(min = durationBadgeMinWidth)
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    } else if (showDurationBadge) {
-                        Surface(
-                            modifier = Modifier.align(Alignment.BottomEnd),
-                            shape = RoundedCornerShape(smallCornerRadius),
-                            color = Color.Black.copy(alpha = durationBadgeStyle.backgroundAlpha)
-                        ) {
-                            Text(
-                                text = durationText,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                softWrap = false,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .widthIn(min = durationBadgeMinWidth)
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
+                    if (showDurationOnCover) {
+                        Text(
+                            text = durationText,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.align(Alignment.BottomEnd)
+                        )
                     }
                 }
             } else {
                 //  非贴封面模式时，时长标签仍独立显示在右下角
-                if (showDurationBadge && badgeStylePolicy.coverStyle == HomeVideoBadgeStyle.GLASS) {
-                    Surface(
+                if (showDurationOnCover) {
+                    Text(
+                        text = durationText,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        softWrap = false,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(
-                                start = 6.dp,
-                                top = 6.dp,
-                                end = 6.dp,
-                                bottom = coverOverlayBottomLayout.floatingDurationBottomPaddingDp.dp
-                            ),
-                        shape = RoundedCornerShape(smallCornerRadius),
-                        color = emphasizedCoverPillColors.containerColor,
-                        border = BorderStroke(0.8.dp, emphasizedCoverPillColors.borderColor)
-                    ) {
-                        Text(
-                            text = durationText,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .widthIn(min = durationBadgeMinWidth)
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                } else if (showDurationBadge) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(
-                                start = 10.dp,
-                                top = 10.dp,
                                 end = 10.dp,
                                 bottom = coverOverlayBottomLayout.floatingDurationBottomPaddingDp.dp
-                            ),
-                        shape = RoundedCornerShape(smallCornerRadius),
-                        color = Color.Black.copy(alpha = durationBadgeStyle.backgroundAlpha)
-                    ) {
-                        Text(
-                            text = durationText,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .widthIn(min = durationBadgeMinWidth)
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
+                            )
+                    )
                 }
             }
             
@@ -1195,6 +1132,16 @@ fun ElegantVideoCard(
                 modifier = upNameModifier
             )
             
+        }
+
+        if (showDurationOutside) {
+            Text(
+                text = durationText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.End)
+            )
         }
 
         if (publishTimeRowText.isNotBlank()) {

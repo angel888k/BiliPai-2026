@@ -1067,6 +1067,7 @@ open class MainActivity : AppCompatActivity() {
 
             val md3ColorSource = appThemeSettings.md3ColorSource
             val md3CustomColorHex = appThemeSettings.md3CustomColorHex
+            val themeRoleOverrides = appThemeSettings.themeRoleOverrides
             val colorStyle = appThemeSettings.colorStyle
             val colorSpec = appThemeSettings.colorSpec
             val themeColorIndex = appThemeSettings.themeColorIndex
@@ -1156,6 +1157,7 @@ open class MainActivity : AppCompatActivity() {
                 themeColorIndex = themeColorIndex, //  传入主题色索引
                 md3ColorSource = md3ColorSource,
                 md3CustomColorHex = md3CustomColorHex,
+                themeRoleOverrides = themeRoleOverrides,
                 colorStyle = colorStyle,
                 colorSpec = colorSpec,
                 fontSizePreset = appFontSizePreset,

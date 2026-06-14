@@ -1690,7 +1690,7 @@ private fun PlaybackFullscreenGestureSettingsSection(
         )
         IOSDivider()
         IOSSwitchItem(
-            icon = rememberSettingsSemanticIcon(SettingsIconRole.PLAYER_ACTIONS),
+            icon = rememberSettingsSemanticIcon(SettingsIconRole.CAST_BUTTON),
             title = "显示投屏按钮",
             subtitle = "同时控制半屏、横屏全屏和竖屏全屏的投屏入口",
             checked = playerControlVisibility.showCastButton,

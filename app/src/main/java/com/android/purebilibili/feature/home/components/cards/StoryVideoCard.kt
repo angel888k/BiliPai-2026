@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -46,13 +47,13 @@ import com.android.purebilibili.core.ui.LocalSharedTransitionEnabled
 import com.android.purebilibili.core.ui.AppShapes
 import com.android.purebilibili.core.ui.ContainerLevel
 import com.android.purebilibili.core.theme.BiliPink
+import com.android.purebilibili.core.store.HomeDurationStyle
 import com.android.purebilibili.core.theme.LocalCornerRadiusScale
 import com.android.purebilibili.core.theme.iOSCornerRadius
 import com.android.purebilibili.core.ui.adaptive.MotionTier
 import com.android.purebilibili.core.ui.components.UpBadgeName
 import com.android.purebilibili.core.ui.components.resolveUpStatsText
 import com.android.purebilibili.core.ui.transition.LocalVideoCardSharedElementSourceRoute
-import com.android.purebilibili.core.ui.transition.VIDEO_SHARED_COVER_ASPECT_RATIO
 import com.android.purebilibili.core.ui.transition.resolveVideoCardSharedTransitionMotionSpec
 import com.android.purebilibili.core.ui.transition.shouldEnableVideoCoverSharedTransition
 import com.android.purebilibili.core.ui.transition.shouldEnableVideoMetadataSharedTransition
@@ -90,7 +91,9 @@ fun StoryVideoCard(
     showCoverGlassBadges: Boolean = true,
     showInfoGlassBadges: Boolean = true,
     showUpBadge: Boolean = true,
-    showDurationBadge: Boolean = true,
+    homeDurationStyle: HomeDurationStyle = HomeDurationStyle.OUTSIDE_COVER,
+    coverAspectRatio: Float = 16f / 10f,
+    cardHorizontalPadding: Dp = 16.dp,
     showOnlineCount: Boolean = false,
     showPublishTime: Boolean = false,
     upFollowerCount: Int? = null,
@@ -106,14 +109,9 @@ fun StoryVideoCard(
     val cornerRadiusScale = LocalCornerRadiusScale.current
     val cardCornerRadius = iOSCornerRadius.ExtraLarge * cornerRadiusScale  // 20.dp * scale
     val smallCornerRadius = iOSCornerRadius.Small * cornerRadiusScale - 2.dp  // 8.dp * scale
-    val durationBadgeStyle = remember { resolveVideoCardDurationBadgeVisualStyle() }
     val durationText = remember(video.duration) { FormatUtils.formatDuration(video.duration) }
-    val durationBadgeMinWidth = remember(durationText, durationBadgeStyle) {
-        resolveVideoCardDurationBadgeMinWidthDp(
-            durationText = durationText,
-            style = durationBadgeStyle
-        ).dp
-    }
+    val showDurationOnCover = homeDurationStyle == HomeDurationStyle.OVERLAY_TEXT_ONLY
+    val showDurationOutside = homeDurationStyle == HomeDurationStyle.OUTSIDE_COVER
     val scrollLitePolicy = remember(scrollLiteModeEnabled) {
         resolveStoryVideoCardScrollLiteVisualPolicy(
             scrollLiteModeEnabled = scrollLiteModeEnabled
@@ -248,7 +246,7 @@ fun StoryVideoCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = cardHorizontalPadding, vertical = 8.dp)
             //  [修复] 进场动画 - 使用 Unit 作为 key，避免分类切换时重新动画
             .animateEnter(
                 index = index, 
@@ -308,7 +306,7 @@ fun StoryVideoCard(
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(VIDEO_SHARED_COVER_ASPECT_RATIO)
+                    .aspectRatio(coverAspectRatio)
                     .clip(RoundedCornerShape(cardCornerRadius)),
                 contentScale = ContentScale.Crop
             )
@@ -334,52 +332,34 @@ fun StoryVideoCard(
             }
             
             //  时长标签 (保留在封面上)
-            if (showDurationBadge && badgeStylePolicy.coverStyle == HomeVideoBadgeStyle.GLASS) {
-                Surface(
+            if (showDurationOnCover) {
+                Text(
+                    text = durationText,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(8.dp),
-                    color = Color.Black.copy(alpha = durationBadgeStyle.backgroundAlpha),
-                    shape = AppShapes.container(ContainerLevel.Chip)
-                ) {
-                    Text(
-                        text = durationText,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .widthIn(min = durationBadgeMinWidth)
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    )
-                }
-            } else if (showDurationBadge) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(14.dp),
-                    color = Color.Black.copy(alpha = durationBadgeStyle.backgroundAlpha),
-                    shape = AppShapes.container(ContainerLevel.Chip)
-                ) {
-                    Text(
-                        text = durationText,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        softWrap = false,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .widthIn(min = durationBadgeMinWidth)
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    )
-                }
+                        .padding(10.dp)
+                )
             }
         }
         
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (showDurationOutside) {
+            Text(
+                text = durationText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.End)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
         
         //  标题
         // 🔗 [共享元素] 标题

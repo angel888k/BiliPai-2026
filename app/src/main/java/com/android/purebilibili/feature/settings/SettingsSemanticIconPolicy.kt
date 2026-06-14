@@ -124,7 +124,9 @@ internal enum class SettingsIconRole {
     SYSTEM_BRIGHTNESS,
     APP_ICON,
     HOME_CARD_STATS_COMPACT,
-    BOTTOM_BAR_GLASS_PREVIEW
+    BOTTOM_BAR_GLASS_PREVIEW,
+    ADVANCED_COLOR,
+    CAST_BUTTON
 }
 
 @Composable
@@ -297,6 +299,8 @@ private fun resolveMd3SettingsSemanticIcon(role: SettingsIconRole): ImageVector 
     SettingsIconRole.APP_ICON -> Icons.Outlined.AppSettingsAlt
     SettingsIconRole.HOME_CARD_STATS_COMPACT -> Icons.Outlined.StackedBarChart
     SettingsIconRole.BOTTOM_BAR_GLASS_PREVIEW -> Icons.Outlined.LensBlur
+    SettingsIconRole.ADVANCED_COLOR -> Icons.Outlined.InvertColors
+    SettingsIconRole.CAST_BUTTON -> Icons.Outlined.Cast
 }
 
 private fun resolveIosSettingsSemanticIcon(role: SettingsIconRole): ImageVector = when (role) {
@@ -413,4 +417,6 @@ private fun resolveIosSettingsSemanticIcon(role: SettingsIconRole): ImageVector 
     SettingsIconRole.APP_ICON -> CupertinoIcons.Outlined.MacwindowBadgePlus
     SettingsIconRole.HOME_CARD_STATS_COMPACT -> CupertinoIcons.Outlined.ChartLineDowntrendXyaxis
     SettingsIconRole.BOTTOM_BAR_GLASS_PREVIEW -> CupertinoIcons.Outlined.CheckerboardShield
+    SettingsIconRole.ADVANCED_COLOR -> CupertinoIcons.Outlined.Paintbrush
+    SettingsIconRole.CAST_BUTTON -> CupertinoIcons.Outlined.Airplayaudio
 }

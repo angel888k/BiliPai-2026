@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import com.android.purebilibili.core.store.ThemeRoleOverrides
 import com.android.purebilibili.feature.settings.AppThemeMode
 import com.android.purebilibili.feature.settings.Md3ColorSource
 import com.android.purebilibili.feature.settings.normalizeMd3CustomColorHex
@@ -746,6 +747,7 @@ fun PureBiliBiliTheme(
         Md3ColorSource.CUSTOM
     },
     md3CustomColorHex: String = "#007AFF",
+    themeRoleOverrides: ThemeRoleOverrides = ThemeRoleOverrides(),
     colorStyle: PaletteStyle = PaletteStyle.TonalSpot,
     colorSpec: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2021,
     fontSizePreset: AppFontSizePreset = AppFontSizePreset.DEFAULT,
@@ -818,16 +820,22 @@ fun PureBiliBiliTheme(
         dynamicBaseScheme = dynamicDarkBaseScheme
     )
 
-    val staticMaterialScheme = if (darkTheme) darkMaterialScheme else lightMaterialScheme
-    val miuixLightColors = remember(lightMaterialScheme) {
+    val resolvedLightMaterialScheme = remember(lightMaterialScheme, themeRoleOverrides) {
+        applyThemeRoleOverrides(lightMaterialScheme, themeRoleOverrides, darkTheme = false)
+    }
+    val resolvedDarkMaterialScheme = remember(darkMaterialScheme, themeRoleOverrides) {
+        applyThemeRoleOverrides(darkMaterialScheme, themeRoleOverrides, darkTheme = true)
+    }
+    val staticMaterialScheme = if (darkTheme) resolvedDarkMaterialScheme else resolvedLightMaterialScheme
+    val miuixLightColors = remember(resolvedLightMaterialScheme) {
         resolveMiuixColorsFromMaterialBridge(
-            bridge = createMiuixMaterialBridge(lightMaterialScheme),
+            bridge = createMiuixMaterialBridge(resolvedLightMaterialScheme),
             darkTheme = false
         )
     }
-    val miuixDarkColors = remember(darkMaterialScheme) {
+    val miuixDarkColors = remember(resolvedDarkMaterialScheme) {
         resolveMiuixColorsFromMaterialBridge(
-            bridge = createMiuixMaterialBridge(darkMaterialScheme),
+            bridge = createMiuixMaterialBridge(resolvedDarkMaterialScheme),
             darkTheme = true
         )
     }

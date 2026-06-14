@@ -31,6 +31,9 @@ class AppThemeSettingsMappingPolicyTest {
         assertEquals(AppLanguage.FOLLOW_SYSTEM, result.appLanguage)
         assertEquals(Md3ColorSource.FOLLOW_WALLPAPER, result.md3ColorSource)
         assertEquals("#007AFF", result.md3CustomColorHex)
+        assertFalse(result.themeRoleOverrides.enabled)
+        assertEquals("#FFFDF8", result.themeRoleOverrides.light.backgroundHex)
+        assertEquals("#121212", result.themeRoleOverrides.dark.backgroundHex)
         assertEquals(0, result.themeColorIndex)
         assertEquals(AppFontSizePreset.DEFAULT, result.appFontSizePreset)
         assertEquals("", result.appFontFileName)
@@ -55,6 +58,10 @@ class AppThemeSettingsMappingPolicyTest {
                 intPreferencesKey("app_language_v1") to AppLanguage.ENGLISH.value,
                 stringPreferencesKey("md3_color_source") to Md3ColorSource.CUSTOM.name,
                 stringPreferencesKey("md3_custom_color_hex") to "#ff00ff",
+                booleanPreferencesKey("theme_role_overrides_enabled") to true,
+                stringPreferencesKey("theme_light_background") to "#f0f1f2",
+                stringPreferencesKey("theme_light_primary_text") to "#111111",
+                stringPreferencesKey("theme_dark_control_accent") to "#abcdef",
                 intPreferencesKey("theme_color_index") to 4,
                 intPreferencesKey("app_font_size_preset") to AppFontSizePreset.LARGE.value,
                 stringPreferencesKey("app_font_file_name") to "demo.ttf",
@@ -75,6 +82,10 @@ class AppThemeSettingsMappingPolicyTest {
         assertEquals(AppLanguage.ENGLISH, result.appLanguage)
         assertEquals(Md3ColorSource.CUSTOM, result.md3ColorSource)
         assertEquals("#FF00FF", result.md3CustomColorHex)
+        assertEquals(true, result.themeRoleOverrides.enabled)
+        assertEquals("#F0F1F2", result.themeRoleOverrides.light.backgroundHex)
+        assertEquals("#111111", result.themeRoleOverrides.light.primaryTextHex)
+        assertEquals("#ABCDEF", result.themeRoleOverrides.dark.controlAccentHex)
         assertEquals(4, result.themeColorIndex)
         assertEquals(AppFontSizePreset.LARGE, result.appFontSizePreset)
         assertEquals("demo.ttf", result.appFontFileName)

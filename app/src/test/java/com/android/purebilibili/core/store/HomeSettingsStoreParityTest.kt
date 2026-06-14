@@ -44,7 +44,7 @@ class HomeSettingsStoreParityTest {
         assertEquals(HomeWallpaperEffectMode.SOFT_BLUR, result.homeWallpaperEffectMode)
         assertEquals(HomeWallpaperEffectScope.HOME_ONLY, result.homeWallpaperEffectScope)
         assertTrue(result.showHomeUpBadges)
-        assertTrue(result.showHomeVideoDurationBadges)
+        assertEquals(HomeDurationStyle.OUTSIDE_COVER, result.homeDurationStyle)
     }
 
     @Test
@@ -65,6 +65,6 @@ class HomeSettingsStoreParityTest {
         assertEquals(HomeWallpaperEffectMode.OFF, result.homeWallpaperEffectMode)
         assertEquals(HomeWallpaperEffectScope.GLOBAL, result.homeWallpaperEffectScope)
         assertEquals(false, result.showHomeUpBadges)
-        assertEquals(false, result.showHomeVideoDurationBadges)
+        assertEquals(HomeDurationStyle.HIDDEN, result.homeDurationStyle)
     }
 }

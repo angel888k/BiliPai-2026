@@ -1609,10 +1609,13 @@ fun HomeScreen(
                                      { subCategory: PopularSubCategory -> viewModel.switchPopularSubCategory(subCategory) }
                                  }
 
+                                 val homeFeedCardLayout = remember(homeSettings.homeFeedCardStyle) {
+                                     resolveHomeFeedCardLayout(homeSettings.homeFeedCardStyle)
+                                 }
                                  val homePageContentPadding = PaddingValues(
                                      bottom = homeListBottomPadding,
-                                     start = 8.dp,
-                                     end = 8.dp,
+                                     start = homeFeedCardLayout.outerPaddingDp.dp,
+                                     end = homeFeedCardLayout.outerPaddingDp.dp,
                                      top = listTopPadding
                                  )
                                  val renderHomeCategoryPage: @Composable (
@@ -1654,7 +1657,8 @@ fun HomeScreen(
                                      wallpaperTintEnabled = homeWallpaperBackdropAppearance.visible,
                                      wallpaperEffectMode = homeSettings.homeWallpaperEffectMode,
                                      showUpBadges = homeSettings.showHomeUpBadges,
-                                     showDurationBadges = homeSettings.showHomeVideoDurationBadges,
+                                     homeDurationStyle = homeSettings.homeDurationStyle,
+                                     homeFeedCardStyle = homeSettings.homeFeedCardStyle,
                                      oldContentAnchorBvid = if (shouldShowRecommendOldContentDivider(
                                              currentCategory = category,
                                              refreshNewItemsKey = refreshNewItemsKey,
@@ -1698,54 +1702,18 @@ fun HomeScreen(
                                  )
                                  }
                                  if (category == HomeCategory.POPULAR) {
-                                     val popularSubCategories = PopularSubCategory.entries
-                                     val selectedPopularPage = popularSubCategories
-                                         .indexOf(popularSubCategory)
-                                         .coerceAtLeast(0)
-                                     val popularPagerState = rememberPagerState(
-                                         initialPage = selectedPopularPage
-                                     ) { popularSubCategories.size }
-
-                                     LaunchedEffect(popularPagerState, selectedPopularPage) {
-                                         if (popularPagerState.currentPage != selectedPopularPage &&
-                                             popularPagerState.targetPage != selectedPopularPage
-                                         ) {
-                                             popularPagerState.animateScrollToPage(selectedPopularPage)
-                                         }
+                                     val subCategoryStateFlow = remember(viewModel, popularSubCategory) {
+                                         viewModel.getPopularCategoryState(popularSubCategory)
                                      }
-                                     LaunchedEffect(popularPagerState) {
-                                         snapshotFlow { popularPagerState.settledPage }
-                                             .distinctUntilChanged()
-                                             .collect { page ->
-                                                 val settledSubCategory = popularSubCategories.getOrNull(page) ?: return@collect
-                                                 viewModel.switchPopularSubCategory(settledSubCategory)
-                                             }
-                                     }
-
-                                     HorizontalPager(
-                                         state = popularPagerState,
-                                         beyondViewportPageCount = 0,
-                                         modifier = Modifier.fillMaxSize(),
-                                         key = { index -> popularSubCategories[index].name }
-                                     ) { subPage ->
-                                         val subCategory = popularSubCategories[subPage]
-                                         val subCategoryStateFlow = remember(viewModel, subCategory) {
-                                             viewModel.getPopularCategoryState(subCategory)
-                                         }
-                                         val subCategoryState by subCategoryStateFlow.collectAsStateWithLifecycle()
-                                         val subCategoryGridState = popularGridStates[subCategory] ?: rememberLazyGridState()
-                                         val onSubCategoryLoadMore = if (subCategory == popularSubCategory) {
-                                             onLoadMoreCallback
-                                         } else {
-                                             {}
-                                         }
-                                         renderHomeCategoryPage(
-                                             subCategoryState,
-                                             subCategoryGridState,
-                                             subCategory,
-                                             onSubCategoryLoadMore
-                                         )
-                                     }
+                                     val subCategoryState by subCategoryStateFlow.collectAsStateWithLifecycle()
+                                     val subCategoryGridState =
+                                         popularGridStates[popularSubCategory] ?: rememberLazyGridState()
+                                     renderHomeCategoryPage(
+                                         subCategoryState,
+                                         subCategoryGridState,
+                                         popularSubCategory,
+                                         onLoadMoreCallback
+                                     )
                                  } else {
                                      renderHomeCategoryPage(
                                          categoryState,

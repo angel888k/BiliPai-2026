@@ -49,7 +49,8 @@ class HomeSettingsMappingPolicyTest {
         assertTrue(result.videoTransitionRealtimeBlurEnabled)
         assertFalse(result.smartVisualGuardEnabled)
         assertTrue(result.compactVideoStatsOnCover)
-        assertTrue(result.showHomeVideoDurationBadges)
+        assertEquals(HomeFeedCardStyle.CURRENT, result.homeFeedCardStyle)
+        assertEquals(HomeDurationStyle.OUTSIDE_COVER, result.homeDurationStyle)
         assertEquals(HomeWallpaperEffectMode.SOFT_BLUR, result.homeWallpaperEffectMode)
         assertEquals(HomeWallpaperEffectScope.HOME_ONLY, result.homeWallpaperEffectScope)
         assertFalse(result.lowQualityHomeCoverInDataSaver)
@@ -82,6 +83,7 @@ class HomeSettingsMappingPolicyTest {
             intPreferencesKey("liquid_glass_style") to LiquidGlassStyle.IOS26.value,
             intPreferencesKey("grid_column_count") to 4,
             intPreferencesKey("home_feed_card_width_preset") to HomeFeedCardWidthPreset.WIDE.value,
+            intPreferencesKey("home_feed_card_style") to HomeFeedCardStyle.OFFICIAL.value,
             booleanPreferencesKey("card_animation_enabled") to true,
             booleanPreferencesKey("card_transition_enabled") to false,
             booleanPreferencesKey("video_transition_realtime_blur_enabled") to false,
@@ -130,7 +132,8 @@ class HomeSettingsMappingPolicyTest {
         assertFalse(result.videoTransitionRealtimeBlurEnabled)
         assertFalse(result.smartVisualGuardEnabled)
         assertFalse(result.compactVideoStatsOnCover)
-        assertFalse(result.showHomeVideoDurationBadges)
+        assertEquals(HomeFeedCardStyle.OFFICIAL, result.homeFeedCardStyle)
+        assertEquals(HomeDurationStyle.HIDDEN, result.homeDurationStyle)
         assertEquals(HomeWallpaperEffectMode.STRONG_BLUR, result.homeWallpaperEffectMode)
         assertEquals(HomeWallpaperEffectScope.GLOBAL, result.homeWallpaperEffectScope)
         assertTrue(result.lowQualityHomeCoverInDataSaver)
@@ -296,6 +299,20 @@ class HomeSettingsMappingPolicyTest {
         assertFalse(result.isTopBarLiquidGlassEnabled)
         assertTrue(result.isBottomBarLiquidGlassEnabled)
         assertTrue(result.isLiquidGlassEnabled)
+    }
+
+    @Test
+    fun homeDurationStyle_explicitValueWinsAndInvalidEnumsFallback() {
+        val explicit = mapHomeSettingsFromPreferences(
+            mutablePreferencesOf(
+                booleanPreferencesKey("home_video_duration_badges_visible") to false,
+                intPreferencesKey("home_duration_style") to HomeDurationStyle.OVERLAY_TEXT_ONLY.value,
+                intPreferencesKey("home_feed_card_style") to 99
+            )
+        )
+
+        assertEquals(HomeDurationStyle.OVERLAY_TEXT_ONLY, explicit.homeDurationStyle)
+        assertEquals(HomeFeedCardStyle.CURRENT, explicit.homeFeedCardStyle)
     }
 
     @Test
