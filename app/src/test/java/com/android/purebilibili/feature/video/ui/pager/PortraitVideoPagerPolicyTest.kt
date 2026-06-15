@@ -483,4 +483,18 @@ class PortraitVideoPagerPolicyTest {
         assertTrue(source.contains("danmakuManager.clearForVideoChange()"))
         assertFalse(source.contains("danmakuManager.clear()\n                isLoading = true"))
     }
+
+    @Test
+    fun portraitPager_isolatesDanmakuAndCommentStateFromUnderlyingDetailPage() {
+        val source = File("src/main/java/com/android/purebilibili/feature/video/ui/pager/PortraitVideoPager.kt").readText()
+        val pagerSignature = source
+            .substringAfter("fun PortraitVideoPager(")
+            .substringBefore(") {")
+
+        assertTrue(source.contains("rememberIsolatedDanmakuManager("))
+        assertTrue(source.contains("key = \"portrait_comments_\$initialBvid\""))
+        assertTrue(source.contains("commentViewModel.clearForVideoChange()"))
+        assertTrue(pagerSignature.contains("viewModel: PlayerViewModel,\n    sharedPlayer: ExoPlayer?"))
+        assertFalse(pagerSignature.contains("commentViewModel: VideoCommentViewModel"))
+    }
 }

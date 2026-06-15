@@ -221,6 +221,19 @@ class VideoCommentViewModel : ViewModel() {
     //  存储原始评论列表（未经筛选），用于筛选切换
     private var allReplies: List<ReplyItem> = emptyList()
 
+    /**
+     * 切换视频时立即废弃旧评论主体和未完成请求，等新页面真正打开评论区后再加载。
+     */
+    fun clearForVideoChange() {
+        currentAid = 0L
+        currentSubject = CommentSubjectKey(0L)
+        allReplies = emptyList()
+        _commentState.value = CommentUiState(
+            currentMid = com.android.purebilibili.core.store.TokenManager.midCache ?: 0L
+        )
+        _subReplyState.value = SubReplyUiState()
+    }
+
     // 初始化/重置
     fun init(
         aid: Long,

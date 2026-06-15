@@ -4022,7 +4022,6 @@ fun VideoDetailScreen(
                         portraitPendingSelectionBvid = newBvid
                     },
                     viewModel = viewModel,
-                    commentViewModel = commentViewModel,
                     sharedPlayer = if (useSharedPortraitPlayer) playerState.player else null,
                     // [新增] 进度同步
                     initialStartPositionMs = portraitSyncSnapshotPositionMs,

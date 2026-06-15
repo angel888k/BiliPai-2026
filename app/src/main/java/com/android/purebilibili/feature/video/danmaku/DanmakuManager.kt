@@ -58,7 +58,7 @@ internal fun shouldApplyDanmakuLoadResult(
 }
 
 /**
- * 弹幕管理器（单例模式）
+ * 弹幕管理器
  * 
  * 使用 ByteDance DanmakuRenderEngine 重构
  * 
@@ -67,7 +67,7 @@ internal fun shouldApplyDanmakuLoadResult(
  * 2. 与 ExoPlayer 同步弹幕播放
  * 3. 管理弹幕视图生命周期
  * 
- * 使用单例模式确保横竖屏切换时保持弹幕状态
+ * 普通播放器通过共享实例保持横竖屏状态；并行播放容器应创建独立会话，避免互相覆盖 cid、视图和加载任务。
  */
 class DanmakuManager private constructor(
     private val context: Context,
@@ -89,6 +89,10 @@ class DanmakuManager private constructor(
                     Log.d(TAG, " DanmakuManager instance created")
                 }
             }
+        }
+
+        internal fun createSession(context: Context, scope: CoroutineScope): DanmakuManager {
+            return DanmakuManager(context.applicationContext, scope)
         }
         
         /**
@@ -2036,6 +2040,26 @@ fun rememberDanmakuManager(): DanmakuManager {
         onDispose { }
     }
     
+    return manager
+}
+
+/**
+ * 为会与普通播放器同时存在的播放容器创建独立弹幕会话。
+ */
+@Composable
+fun rememberIsolatedDanmakuManager(sessionKey: Any): DanmakuManager {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val manager = remember(context.applicationContext, sessionKey) {
+        DanmakuManager.createSession(context, scope)
+    }
+
+    DisposableEffect(manager) {
+        onDispose {
+            manager.release()
+        }
+    }
+
     return manager
 }
 

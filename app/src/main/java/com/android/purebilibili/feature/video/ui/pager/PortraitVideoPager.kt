@@ -86,7 +86,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackParameters
@@ -114,7 +113,7 @@ import com.android.purebilibili.data.model.response.Stat
 import com.android.purebilibili.data.model.response.ViewInfo
 import com.android.purebilibili.feature.video.player.PlaylistManager
 import com.android.purebilibili.feature.video.danmaku.DanmakuManager
-import com.android.purebilibili.feature.video.danmaku.rememberDanmakuManager
+import com.android.purebilibili.feature.video.danmaku.rememberIsolatedDanmakuManager
 import com.android.purebilibili.feature.video.playback.session.PlaybackSeekSessionState
 import com.android.purebilibili.feature.video.playback.session.SEEK_PLAYBACK_RECOVERY_DELAY_MS
 import com.android.purebilibili.feature.video.playback.session.shouldAttemptPlaybackRecoveryAfterSeek
@@ -193,7 +192,6 @@ fun PortraitVideoPager(
     onHomeClick: () -> Unit = onBack,
     onVideoChange: (String) -> Unit,
     viewModel: PlayerViewModel,
-    commentViewModel: VideoCommentViewModel,
     sharedPlayer: ExoPlayer? = null,
     initialStartPositionMs: Long = 0L,
     onProgressUpdate: (String, Long, Long) -> Unit = { _, _, _ -> },
@@ -203,10 +201,16 @@ fun PortraitVideoPager(
     onRotateToLandscape: () -> Unit
 ) {
     val context = LocalContext.current
+    val commentViewModel: VideoCommentViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel(
+            key = "portrait_comments_$initialBvid"
+        )
     val useSharedPlayer = sharedPlayer != null
     val entryStartPositionMs = remember(initialBvid) { initialStartPositionMs.coerceAtLeast(0L) }
     val scope = rememberCoroutineScope()
-    val danmakuManager = rememberDanmakuManager()
+    val danmakuManager = rememberIsolatedDanmakuManager(
+        sessionKey = "portrait_danmaku_$initialBvid"
+    )
     val danmakuScope = DanmakuSettingsScope.PORTRAIT
     val loadedDanmakuSettings by produceState<DanmakuSettings?>(
         initialValue = null,
@@ -652,7 +656,7 @@ fun PortraitVideoPager(
                 val bvid = if (item is ViewInfo) item.bvid else (item as RelatedVideo).bvid
                 val aid = if (item is ViewInfo) item.aid else (item as RelatedVideo).aid
 
-                commentViewModel.closeSubReply()
+                commentViewModel.clearForVideoChange()
                 onVideoChange(bvid)
 
                 if (!isPortraitPlaybackAllowed) {
@@ -871,6 +875,17 @@ fun PortraitVideoPager(
             danmakuManager.loadDanmaku(currentPlayingCid, currentPlayingAid, durationMs.coerceAtLeast(0L))
         } else {
             danmakuManager.isEnabled = false
+        }
+    }
+
+    LaunchedEffect(viewModel, danmakuManager) {
+        viewModel.danmakuSentEvent.collect { danmakuData ->
+            danmakuManager.addLocalDanmaku(
+                text = danmakuData.text,
+                color = danmakuData.color,
+                mode = danmakuData.mode,
+                fontSize = danmakuData.fontSize
+            )
         }
     }
 

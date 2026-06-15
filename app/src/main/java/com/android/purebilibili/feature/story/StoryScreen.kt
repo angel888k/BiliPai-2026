@@ -22,14 +22,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import com.android.purebilibili.feature.video.ui.pager.PortraitVideoPager
 import com.android.purebilibili.feature.video.viewmodel.PlayerViewModel
-import com.android.purebilibili.feature.video.viewmodel.VideoCommentViewModel
 
 @UnstableApi
 @Composable
 fun StoryScreen(
     viewModel: StoryViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
-    commentViewModel: VideoCommentViewModel = viewModel(),
     isActive: Boolean = true,
     onBack: () -> Unit,
     onVideoClick: (String, Long, String) -> Unit = { _, _, _ -> },
@@ -82,7 +80,6 @@ fun StoryScreen(
                     onHomeClick = onBack,
                     onVideoChange = { },
                     viewModel = playerViewModel,
-                    commentViewModel = commentViewModel,
                     onExitSnapshot = { bvid, _, cid ->
                         latestExitSnapshot = StoryPortraitExitSnapshot(
                             bvid = bvid,
