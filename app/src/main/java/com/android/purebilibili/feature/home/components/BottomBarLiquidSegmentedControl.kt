@@ -269,6 +269,19 @@ internal fun resolveCombinedIndicatorSettleReboundTransform(
     )
 }
 
+internal fun shouldAnimateSegmentedControlDragSettle(
+    pagerLinked: Boolean,
+): Boolean = !pagerLinked
+
+internal fun shouldSnapSegmentedControlPagerIdlePosition(
+    currentValue: Float,
+    targetIndex: Int,
+    isRunning: Boolean,
+): Boolean {
+    if (isRunning) return false
+    return abs(currentValue - targetIndex.toFloat()) > 0.01f
+}
+
 @Composable
 internal fun BottomBarLiquidIndicatorSurface(
     modifier: Modifier = Modifier,
@@ -392,6 +405,7 @@ private fun Modifier.segmentedControlSelectionGesture(
     itemWidthPx: Float,
     itemCount: Int,
     currentSelectedIndex: Int,
+    animateDragSettle: Boolean,
     onSweepSelected: (Int) -> Unit,
     shouldFollowIndicatorFrom: (Float) -> Boolean
 ): Modifier = this.pointerInput(
@@ -399,6 +413,7 @@ private fun Modifier.segmentedControlSelectionGesture(
     itemWidthPx,
     itemCount,
     currentSelectedIndex,
+    animateDragSettle,
     shouldFollowIndicatorFrom
 ) {
     val velocityTracker = VelocityTracker()
@@ -448,7 +463,8 @@ private fun Modifier.segmentedControlSelectionGesture(
                         velocityX = velocityX,
                         itemWidthPx = itemWidthPx,
                         settleIndex = null,
-                        notifyIndexChanged = true
+                        notifyIndexChanged = true,
+                        animateSettle = animateDragSettle,
                     )
                 } else if (!isCancelled) {
                     val releaseIndex = resolveSegmentedControlSweepSelectionIndex(
@@ -579,16 +595,25 @@ fun BottomBarLiquidSegmentedControl(
     fun selectFromTap(index: Int) {
         if (!enabled || index !in items.indices) return
         clickPulseKey.intValue += 1
-        if (pagerLinked) {
-            dragState.updateIndex(index)
-        }
         onSelected(index)
     }
     val latestPagerIndicatorPosition by rememberUpdatedState(pagerIndicatorPosition)
     val latestPagerIsScrolling by rememberUpdatedState(pagerIsScrolling)
     LaunchedEffect(safeSelectedIndex, latestPagerIsScrolling, dragState, pagerLinked) {
         if (!latestPagerIsScrolling && !dragState.isDragging) {
-            dragState.updateIndex(safeSelectedIndex)
+            if (pagerLinked) {
+                if (
+                    shouldSnapSegmentedControlPagerIdlePosition(
+                        currentValue = dragState.value,
+                        targetIndex = safeSelectedIndex,
+                        isRunning = dragState.isRunning,
+                    )
+                ) {
+                    dragState.snapTo(safeSelectedIndex.toFloat())
+                }
+            } else {
+                dragState.updateIndex(safeSelectedIndex)
+            }
         }
     }
     LaunchedEffect(dragState, itemCount, pagerLinked) {
@@ -670,6 +695,7 @@ fun BottomBarLiquidSegmentedControl(
                 itemWidthPx = itemWidthPx,
                 itemCount = itemCount,
                 currentSelectedIndex = safeSelectedIndex,
+                animateDragSettle = shouldAnimateSegmentedControlDragSettle(pagerLinked = pagerLinked),
                 onSweepSelected = { index ->
                     if (index != safeSelectedIndex) {
                         onSelected(index)

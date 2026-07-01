@@ -299,7 +299,8 @@ internal class DampedDragAnimationState(
         velocityX: Float,
         itemWidthPx: Float,
         settleIndex: Int? = null,
-        notifyIndexChanged: Boolean = true
+        notifyIndexChanged: Boolean = true,
+        animateSettle: Boolean = true,
     ) {
         if (itemWidthPx <= 0f || itemCount <= 0) return
         isDragging = false
@@ -315,14 +316,30 @@ internal class DampedDragAnimationState(
                 itemCount = itemCount,
                 motionSpec = motionSpec
             )
+        val releaseTargetValue = releaseTargetIndex.toFloat()
         targetIndex = releaseTargetIndex
-        desiredValue = releaseTargetIndex.toFloat()
+        desiredValue = releaseTargetValue
         if (notifyIndexChanged && notifyIndexChangedOnReleaseStart) {
             onIndexChanged(releaseTargetIndex)
         }
-        animateToValue(releaseTargetIndex.toFloat()) {
-            if (generation == motionGeneration) {
-                velocityPxPerSecond = 0f
+        if (animateSettle) {
+            animateToValue(releaseTargetValue) {
+                if (generation == motionGeneration) {
+                    velocityPxPerSecond = 0f
+                    settledReleaseCount += 1
+                    if (notifyIndexChanged && !notifyIndexChangedOnReleaseStart) {
+                        onIndexChanged(releaseTargetIndex)
+                    }
+                }
+            }
+        } else {
+            valueJob?.cancel()
+            scope.launch {
+                if (generation != motionGeneration) return@launch
+                valueAnimation.stop()
+                valueAnimation.snapTo(releaseTargetValue)
+                velocityAnimation.snapTo(0f)
+                release()
                 settledReleaseCount += 1
                 if (notifyIndexChanged && !notifyIndexChangedOnReleaseStart) {
                     onIndexChanged(releaseTargetIndex)

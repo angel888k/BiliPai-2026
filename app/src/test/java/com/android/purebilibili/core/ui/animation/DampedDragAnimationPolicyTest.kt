@@ -50,6 +50,7 @@ class DampedDragAnimationPolicyTest {
         // 偏移累计保留（KSU 风格）
         assertTrue(dragSource.contains("offsetAnimation.snapTo(offsetAnimation.value + dragAmountPx)"))
         // 9.0.0 速度飞掷投影
+        assertTrue(releaseSource.contains("animateSettle: Boolean = true"))
         assertTrue(releaseSource.contains("resolveDampedDragReleaseTargetIndex("))
         assertTrue(releaseSource.contains("velocityPxPerSecond = velocityX"))
         assertTrue(releaseSource.contains("offsetAnimation.animateTo(0f"))

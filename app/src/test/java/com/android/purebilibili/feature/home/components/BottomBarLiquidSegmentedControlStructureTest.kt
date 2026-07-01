@@ -354,6 +354,22 @@ class BottomBarLiquidSegmentedControlStructureTest {
     fun `pager linked segmented control reuses bottom bar drag state path`() {
         assertTrue(resolveSegmentedControlPagerLinked(pagerIndicatorPosition = 0.4f))
         assertFalse(resolveSegmentedControlPagerLinked(pagerIndicatorPosition = null))
+        assertFalse(shouldAnimateSegmentedControlDragSettle(pagerLinked = true))
+        assertTrue(shouldAnimateSegmentedControlDragSettle(pagerLinked = false))
+        assertTrue(
+            shouldSnapSegmentedControlPagerIdlePosition(
+                currentValue = 0.42f,
+                targetIndex = 1,
+                isRunning = false,
+            )
+        )
+        assertFalse(
+            shouldSnapSegmentedControlPagerIdlePosition(
+                currentValue = 1f,
+                targetIndex = 1,
+                isRunning = false,
+            )
+        )
     }
 
     @Test
@@ -473,8 +489,15 @@ class BottomBarLiquidSegmentedControlStructureTest {
         assertTrue(source.contains("resolveSegmentedControlPagerLinked("))
         assertTrue(source.contains("resolveSegmentedControlIndicatorPressProgress("))
         assertTrue(source.contains("effectiveIndicatorPressProgress"))
-        assertTrue(source.contains("dragState.updateIndex(index)"))
+        assertTrue(source.contains("shouldAnimateSegmentedControlDragSettle("))
+        assertTrue(source.contains("animateSettle = animateDragSettle"))
+        assertTrue(source.contains("shouldSnapSegmentedControlPagerIdlePosition("))
+        assertTrue(source.contains("dragState.snapTo(safeSelectedIndex.toFloat())"))
         assertTrue(source.contains("dragState.updateIndex(safeSelectedIndex)"))
+        assertFalse(
+            source.substringAfter("fun selectFromTap(").substringBefore("val latestPagerIndicatorPosition")
+                .contains("dragState.updateIndex(index)")
+        )
         assertFalse(
             source.contains("effectiveIndicatorPosition"),
             "Pager-linked tabs must render from dragState like the home bottom bar, not a parallel pager offset path"
