@@ -174,21 +174,23 @@ class WatchLaterViewModel(application: Application) : AndroidViewModel(applicati
     )
     
     init {
-        loadData()
         observeWatchLaterRefresh()
     }
 
     private fun observeWatchLaterRefresh() {
         viewModelScope.launch {
             WatchLaterRefreshBus.changes.collect {
-                loadData()
+                loadData(showLoading = false)
             }
         }
     }
     
-    fun loadData() {
+    fun loadData(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val shouldShowLoading = showLoading || _uiState.value.items.isEmpty()
+            if (shouldShowLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            }
             try {
                 val api = NetworkModule.api
                 val response = api.getWatchLaterList()

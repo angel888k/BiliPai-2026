@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.purebilibili.core.coroutines.AppScope
 import com.android.purebilibili.core.network.NetworkModule
+import com.android.purebilibili.core.refresh.HistoryRefreshBus
 import com.android.purebilibili.data.model.response.VideoItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -36,9 +37,12 @@ abstract class BaseListViewModel(application: Application, private val pageTitle
     val uiState = _uiState.asStateFlow()
 
     // 应当在子类初始化完成后调用
-    fun loadData() {
+    fun loadData(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val shouldShowLoading = showLoading || _uiState.value.items.isEmpty()
+            if (shouldShowLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            }
             try {
                 val items = fetchItems()
                 _uiState.value = _uiState.value.copy(isLoading = false, items = items)
@@ -572,6 +576,15 @@ class HistoryViewModel(application: Application) : BaseListViewModel(application
 
     init {
         loadHistoryPauseState()
+        observeHistoryRefresh()
+    }
+
+    private fun observeHistoryRefresh() {
+        viewModelScope.launch {
+            HistoryRefreshBus.changes.collect {
+                loadData(showLoading = false)
+            }
+        }
     }
 }
 

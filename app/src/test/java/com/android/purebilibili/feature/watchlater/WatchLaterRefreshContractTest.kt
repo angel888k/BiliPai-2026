@@ -54,6 +54,21 @@ class WatchLaterRefreshContractTest {
     }
 
     @Test
+    fun bottomWatchLaterTab_refreshesWhenPagerPageBecomesActive() {
+        val source = sourceText("src/main/java/com/android/purebilibili/navigation/AppNavigation.kt")
+        val watchLaterSection = source.substringAfter("BiliPaiNavEntryContentRole.WATCH_LATER")
+
+        assertTrue(
+            watchLaterSection.contains("isBottomPagerPageActive"),
+            "稍后再看底栏页必须感知 pager 激活状态"
+        )
+        assertTrue(
+            watchLaterSection.contains("watchLaterViewModel.loadData("),
+            "稍后再看底栏页激活时必须重新拉取列表"
+        )
+    }
+
+    @Test
     fun watchLaterScreen_usesDenseListCardsInsteadOfAdaptiveGrid() {
         val source = sourceText("src/main/java/com/android/purebilibili/feature/watchlater/WatchLaterScreen.kt")
         val listBranch = source

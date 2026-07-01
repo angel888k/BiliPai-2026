@@ -1418,16 +1418,12 @@ fun AppNavigation(
                         BiliPaiNavEntryContentRole.HISTORY -> {
                                 val historyViewModel: HistoryViewModel = viewModel()
                                 val historyNavigationScope = rememberCoroutineScope()
-                                var historyHasActivated by rememberSaveable {
-                                    mutableStateOf(false)
-                                }
                                 androidx.compose.runtime.LaunchedEffect(
                                     historyViewModel,
                                     isBottomPagerPageActive
                                 ) {
-                                    if (isBottomPagerPageActive && !historyHasActivated) {
-                                        historyHasActivated = true
-                                        historyViewModel.loadData()
+                                    if (isBottomPagerPageActive) {
+                                        historyViewModel.loadData(showLoading = historyViewModel.uiState.value.items.isEmpty())
                                     }
                                 }
                                 CommonListScreen(
@@ -1918,22 +1914,36 @@ fun AppNavigation(
                             com.android.purebilibili.feature.settings.TipsSettingsScreen(
                                 onBack = { performSystemBackAction() }
                             )
-                        BiliPaiNavEntryContentRole.WATCH_LATER -> com.android.purebilibili.feature.watchlater.WatchLaterScreen(
-                                onBack = { performSystemBackAction() },
-                                onVideoClick = { bvid, cid, resumePositionMs ->
-                                    navigateToVideoInNavigation3(bvid, cid, "", resumePositionMs = resumePositionMs)
-                                },
-                                onPlayAllAudioClick = { bvid, cid, resumePositionMs ->
-                                    navigateToVideoInNavigation3(
-                                        bvid,
-                                        cid,
-                                        "",
-                                        startAudio = true,
-                                        resumePositionMs = resumePositionMs
-                                    )
-                                },
-                                globalHazeState = mainHazeState
-                            )
+                        BiliPaiNavEntryContentRole.WATCH_LATER -> {
+                                val watchLaterViewModel: com.android.purebilibili.feature.watchlater.WatchLaterViewModel = viewModel()
+                                androidx.compose.runtime.LaunchedEffect(
+                                    watchLaterViewModel,
+                                    isBottomPagerPageActive
+                                ) {
+                                    if (isBottomPagerPageActive) {
+                                        watchLaterViewModel.loadData(
+                                            showLoading = watchLaterViewModel.uiState.value.items.isEmpty()
+                                        )
+                                    }
+                                }
+                                com.android.purebilibili.feature.watchlater.WatchLaterScreen(
+                                    onBack = { performSystemBackAction() },
+                                    onVideoClick = { bvid, cid, resumePositionMs ->
+                                        navigateToVideoInNavigation3(bvid, cid, "", resumePositionMs = resumePositionMs)
+                                    },
+                                    onPlayAllAudioClick = { bvid, cid, resumePositionMs ->
+                                        navigateToVideoInNavigation3(
+                                            bvid,
+                                            cid,
+                                            "",
+                                            startAudio = true,
+                                            resumePositionMs = resumePositionMs
+                                        )
+                                    },
+                                    viewModel = watchLaterViewModel,
+                                    globalHazeState = mainHazeState
+                                )
+                            }
                         BiliPaiNavEntryContentRole.FOLLOWING -> {
                                 val followingKey = key as BiliPaiNavKey.Following
                                 com.android.purebilibili.feature.following.FollowingListScreen(

@@ -752,7 +752,12 @@ object VideoRepository {
             )
             val resp = api.reportHeartbeat(fields)
             com.android.purebilibili.core.util.Logger.d("VideoRepo", "🔴 Heartbeat response: code=${resp.code}, msg=${resp.message}")
-            resp.code == 0
+            if (resp.code == 0) {
+                com.android.purebilibili.core.refresh.HistoryRefreshBus.notifyChanged()
+                true
+            } else {
+                false
+            }
         } catch (e: Exception) {
             android.util.Log.e("VideoRepo", " Heartbeat failed: ${e.message}")
             false
