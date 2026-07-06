@@ -606,12 +606,6 @@ internal fun resolveDanmakuDialogTopReservePx(
     return (playerBottomPx ?: fallbackPlayerBottomPx).coerceAtLeast(0)
 }
 
-internal data class VideoDetailEntryVisualFrame(
-    val contentAlpha: Float,
-    val scrimAlpha: Float,
-    val blurRadiusPx: Float
-)
-
 internal data class VideoDetailRouteSheetMotion(
     val enabled: Boolean,
     val durationMillis: Int,
@@ -845,16 +839,6 @@ private fun VideoDetailRouteSheetHost(
         content()
         overlayContent()
     }
-}
-
-internal fun resolveVideoDetailEntryVisualFrame(): VideoDetailEntryVisualFrame {
-    // 共享元素模式下，sharedBounds 已经处理视觉过渡，
-    // 额外的 alpha/blur 会与共享元素动画冲突导致闪烁。
-    return VideoDetailEntryVisualFrame(
-        contentAlpha = 1f,
-        scrimAlpha = 0f,
-        blurRadiusPx = 0f
-    )
 }
 
 internal fun shouldApplyPipParamsUpdate(
@@ -1337,10 +1321,6 @@ fun VideoDetailScreen(
             )
         )
         isTransitionFinished = true
-    }
-
-    val entryVisualFrame = remember {
-        resolveVideoDetailEntryVisualFrame()
     }
 
     //  监听评论状态
@@ -3690,7 +3670,6 @@ fun VideoDetailScreen(
                                         sortPreferenceScope = sortPreferenceScope,
                                         playerState = playerState,
                                         motionSpec = motionSpec,
-                                        entryVisualFrame = entryVisualFrame,
                                         hazeState = hazeState,
                                         isTransitionFinished = isTransitionFinished,
                                         isLeaving = isLeaving,

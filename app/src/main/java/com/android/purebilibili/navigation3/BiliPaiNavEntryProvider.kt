@@ -23,11 +23,13 @@ private val CARD_RETURN_TARGET_ROUTE_BASES = setOf(
     "search",
     "history",
     "favorite",
+    "liked_videos",
     "watch_later",
     "partition",
     "dynamic_detail",
     "space",
-    "category"
+    "category",
+    "season_series_detail"
 )
 private val SETTINGS_LIGHT_SIBLING_ROUTE_BASES = setOf(
     "appearance_settings",

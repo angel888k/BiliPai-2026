@@ -1337,7 +1337,8 @@ fun AppNavigation(
                             if (shouldApplyBackground) {
                                 baseModifier.videoCardTransitionBackgroundEffect(
                                     progressProvider = backgroundState.progressProvider,
-                                    phaseProvider = backgroundState.phaseProvider
+                                    phaseProvider = backgroundState.phaseProvider,
+                                    motionTierProvider = backgroundState.motionTierProvider
                                 )
                             } else {
                                 baseModifier

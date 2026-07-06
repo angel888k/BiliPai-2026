@@ -41,6 +41,8 @@ import androidx.navigationevent.compose.NavigationEventState
 import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.navigationevent.NavigationEventTransitionState
 import com.android.purebilibili.core.ui.ProvideAnimatedVisibilityScope
+import com.android.purebilibili.core.ui.adaptive.MotionTier
+import com.android.purebilibili.core.ui.motion.rememberSystemReduceMotion
 import com.android.purebilibili.core.ui.transition.LocalVideoCardSharedElementSourceRoute
 import com.android.purebilibili.core.ui.transition.LocalVideoCardTransitionBackgroundState
 import com.android.purebilibili.core.ui.transition.VIDEO_CARD_TRANSITION_BACKGROUND_CANCEL_DURATION_MS
@@ -83,6 +85,9 @@ internal fun BiliPaiNavDisplayHost(
     var videoCardTransitionBackgroundPhase by remember {
         mutableStateOf(VideoCardTransitionBackgroundPhase.IDLE)
     }
+    // 系统减弱动画(省电/无障碍/开发者选项)时，过渡背景降级为仅 scrim，跳过全屏 GPU 实时模糊。
+    val videoCardTransitionBackgroundMotionTier =
+        if (rememberSystemReduceMotion()) MotionTier.Reduced else MotionTier.Normal
     var previousVideoCardTransitionBackStack by remember {
         mutableStateOf(safeBackStack)
     }
@@ -198,6 +203,7 @@ internal fun BiliPaiNavDisplayHost(
         content,
         application,
         videoCardTransitionBackgroundProgress,
+        videoCardTransitionBackgroundMotionTier,
     ) {
         { key ->
             val entryRoute = key.toLegacyRoute()
@@ -213,6 +219,9 @@ internal fun BiliPaiNavDisplayHost(
                             },
                             phaseProvider = {
                                 videoCardTransitionBackgroundPhase
+                            },
+                            motionTierProvider = {
+                                videoCardTransitionBackgroundMotionTier
                             }
                         )
                     ) {

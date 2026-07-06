@@ -1,11 +1,34 @@
 package com.android.purebilibili.core.ui.transition
 
+import com.android.purebilibili.core.ui.adaptive.MotionTier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VideoCardTransitionBackgroundPolicyTest {
+
+    @Test
+    fun reducedMotionTierSkipsRealtimeBlurButKeepsOpeningScrimAndScale() {
+        val opening = resolveVideoCardTransitionBackgroundFrame(
+            progress = 1f,
+            phase = VideoCardTransitionBackgroundPhase.OPENING,
+            motionTier = MotionTier.Reduced,
+            sdkInt = 35
+        )
+        val returning = resolveVideoCardTransitionBackgroundFrame(
+            progress = 1f,
+            phase = VideoCardTransitionBackgroundPhase.RETURNING,
+            motionTier = MotionTier.Reduced,
+            sdkInt = 35
+        )
+
+        assertEquals(0f, opening.blurRadiusPx)
+        assertTrue(opening.scrimAlpha > 0f)
+        assertTrue(opening.contentScale < 1f)
+        assertEquals(0f, returning.blurRadiusPx)
+        assertTrue(returning.scrimAlpha > 0f)
+    }
 
     @Test
     fun api35OpeningFrameUsesOriginalBlurStrengthAndScrim() {

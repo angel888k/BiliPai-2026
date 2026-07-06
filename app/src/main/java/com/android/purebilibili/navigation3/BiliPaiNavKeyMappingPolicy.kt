@@ -272,10 +272,12 @@ internal fun isCardReturnTargetNavKey(key: BiliPaiNavKey): Boolean {
         BiliPaiNavKey.Search,
         BiliPaiNavKey.History,
         BiliPaiNavKey.Favorite,
+        BiliPaiNavKey.LikedVideos,
         BiliPaiNavKey.WatchLater,
         BiliPaiNavKey.Partition,
         is BiliPaiNavKey.DynamicDetail,
         is BiliPaiNavKey.Space,
+        is BiliPaiNavKey.SeasonSeriesDetail,
         is BiliPaiNavKey.Category -> true
         else -> false
     }

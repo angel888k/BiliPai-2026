@@ -9,6 +9,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import com.android.purebilibili.core.ui.adaptive.MotionTier
 import com.android.purebilibili.navigation.isVideoCardReturnTargetRoute
 import kotlin.math.roundToInt
 
@@ -18,7 +19,9 @@ private const val VIDEO_CARD_TRANSITION_MAX_SCRIM_ALPHA = 0.22f
 private const val VIDEO_CARD_TRANSITION_RETURN_SCRIM_ALPHA = 0.10f
 private const val VIDEO_CARD_TRANSITION_MAX_CONTENT_SCALE_REDUCTION = 0.045f
 
-internal const val VIDEO_CARD_TRANSITION_BACKGROUND_FORWARD_DURATION_MS = 160
+// 开场背景虚化时长与共享元素 morph(标准 460ms)大致同步，
+// 略短以便卡片落位前背景已完成虚化，避免 160ms 内 blur 一闪就到位的突兀感。
+internal const val VIDEO_CARD_TRANSITION_BACKGROUND_FORWARD_DURATION_MS = 300
 internal const val VIDEO_CARD_TRANSITION_BACKGROUND_RETURN_DURATION_MS = 460
 internal const val VIDEO_CARD_TRANSITION_BACKGROUND_CANCEL_DURATION_MS = 160
 
@@ -39,7 +42,8 @@ internal data class VideoCardTransitionBackgroundState(
     val progressProvider: () -> Float = { 0f },
     val phaseProvider: () -> VideoCardTransitionBackgroundPhase = {
         VideoCardTransitionBackgroundPhase.IDLE
-    }
+    },
+    val motionTierProvider: () -> MotionTier = { MotionTier.Normal }
 )
 
 internal val LocalVideoCardTransitionBackgroundState = compositionLocalOf {
@@ -49,12 +53,16 @@ internal val LocalVideoCardTransitionBackgroundState = compositionLocalOf {
 internal fun resolveVideoCardTransitionBackgroundFrame(
     progress: Float,
     phase: VideoCardTransitionBackgroundPhase,
+    motionTier: MotionTier = MotionTier.Normal,
     sdkInt: Int = Build.VERSION.SDK_INT
 ): VideoCardTransitionBackgroundFrame {
     val clamped = progress.coerceIn(0f, 1f)
     val blurStrength = resolveVideoCardTransitionBlurStrength(clamped)
+    // 低端/省电/无障碍减弱动画(Reduced)时跳过整帧 GPU 实时模糊，
+    // 仅保留 scrim + 轻微缩放作为回退，避免全屏 RenderEffect 的开销。
     val rawBlurRadiusPx = if (
         phase != VideoCardTransitionBackgroundPhase.IDLE &&
+        motionTier != MotionTier.Reduced &&
         sdkInt >= Build.VERSION_CODES.S
     ) {
         VIDEO_CARD_TRANSITION_MAX_BLUR_RADIUS_PX * blurStrength
@@ -95,15 +103,43 @@ internal fun shouldApplyVideoCardTransitionBackgroundToRoute(
         normalizeVideoCardTransitionRoute(activeMainHostRoute) == normalizedSourceRoute
 }
 
+/**
+ * 每帧内 graphicsLayer 与 drawWithContent 会先后读取同一 frame，
+ * 用一个基于 (progress, phase) 的一次性缓存避免同帧重复计算纯函数。
+ */
+private class VideoCardTransitionBackgroundFrameCache {
+    private var lastProgress = Float.NaN
+    private var lastPhase: VideoCardTransitionBackgroundPhase? = null
+    private var lastMotionTier: MotionTier? = null
+    private var cached = VideoCardTransitionBackgroundFrame(
+        blurRadiusPx = 0f,
+        scrimAlpha = 0f,
+        contentScale = 1f
+    )
+
+    fun resolve(
+        progress: Float,
+        phase: VideoCardTransitionBackgroundPhase,
+        motionTier: MotionTier
+    ): VideoCardTransitionBackgroundFrame {
+        if (progress != lastProgress || phase != lastPhase || motionTier != lastMotionTier) {
+            lastProgress = progress
+            lastPhase = phase
+            lastMotionTier = motionTier
+            cached = resolveVideoCardTransitionBackgroundFrame(progress, phase, motionTier)
+        }
+        return cached
+    }
+}
+
 internal fun Modifier.videoCardTransitionBackgroundEffect(
     progressProvider: () -> Float,
-    phaseProvider: () -> VideoCardTransitionBackgroundPhase
+    phaseProvider: () -> VideoCardTransitionBackgroundPhase,
+    motionTierProvider: () -> MotionTier = { MotionTier.Normal }
 ): Modifier {
+    val frameCache = VideoCardTransitionBackgroundFrameCache()
     return graphicsLayer {
-        val frame = resolveVideoCardTransitionBackgroundFrame(
-            progress = progressProvider(),
-            phase = phaseProvider()
-        )
+        val frame = frameCache.resolve(progressProvider(), phaseProvider(), motionTierProvider())
         scaleX = frame.contentScale
         scaleY = frame.contentScale
         renderEffect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && frame.blurRadiusPx > 0.01f) {
@@ -119,10 +155,7 @@ internal fun Modifier.videoCardTransitionBackgroundEffect(
         }
     }.drawWithContent {
         drawContent()
-        val frame = resolveVideoCardTransitionBackgroundFrame(
-            progress = progressProvider(),
-            phase = phaseProvider()
-        )
+        val frame = frameCache.resolve(progressProvider(), phaseProvider(), motionTierProvider())
         if (frame.scrimAlpha > 0.001f) {
             drawRect(Color.Black.copy(alpha = frame.scrimAlpha))
         }
