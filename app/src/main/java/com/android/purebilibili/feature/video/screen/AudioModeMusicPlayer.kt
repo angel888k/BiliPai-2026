@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.android.purebilibili.core.player.PlayerVolumeController
 import com.android.purebilibili.core.util.FormatUtils
+import com.android.purebilibili.data.model.response.Page
 import com.android.purebilibili.feature.audio.player.MusicPlayerUiState
 import com.android.purebilibili.feature.audio.player.MusicLyricCandidateUi
 import com.android.purebilibili.feature.audio.player.MusicQueueItemUi
@@ -26,6 +29,7 @@ import com.android.purebilibili.feature.audio.screen.MusicPlayerContent
 import com.android.purebilibili.feature.audio.viewmodel.MusicViewModel
 import com.android.purebilibili.feature.video.player.PlaylistManager
 import com.android.purebilibili.feature.video.ui.components.CollectionSheet
+import com.android.purebilibili.feature.video.ui.components.PagesSelector
 import com.android.purebilibili.feature.video.viewmodel.PlayerUiState
 import com.android.purebilibili.feature.video.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
@@ -38,6 +42,37 @@ private data class AudioPlaybackSnapshot(
     val durationMs: Long = 0L
 )
 
+internal fun resolveAudioModeTrackTitle(
+    videoTitle: String,
+    currentCid: Long,
+    pages: List<Page>
+): String {
+    return pages.firstOrNull { it.cid == currentCid }
+        ?.part
+        ?.takeIf { it.isNotBlank() }
+        ?: videoTitle
+}
+
+internal data class AudioModeLyricMetadata(
+    val title: String,
+    val artist: String
+)
+
+internal fun resolveAudioModeLyricMetadata(
+    trackTitle: String,
+    fallbackArtist: String
+): AudioModeLyricMetadata {
+    val match = Regex(
+        """^\s*(?:P?\d{1,4}\s*[.、:：_-]\s*)?(.+?)\s+[-–—]\s+(.+?)\s*$""",
+        RegexOption.IGNORE_CASE
+    ).matchEntire(trackTitle)
+    return AudioModeLyricMetadata(
+        title = match?.groupValues?.getOrNull(1)?.trim().orEmpty().ifBlank { trackTitle },
+        artist = match?.groupValues?.getOrNull(2)?.trim().orEmpty().ifBlank { fallbackArtist }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AudioModeMusicPlayer(
     viewModel: PlayerViewModel,
@@ -66,7 +101,11 @@ internal fun AudioModeMusicPlayer(
 
     val context = LocalContext.current
     val info = successState.info
-    val displayTitle = titleOverride?.takeIf { it.isNotBlank() } ?: info.title
+    val displayTitle = resolveAudioModeTrackTitle(
+        videoTitle = titleOverride?.takeIf { it.isNotBlank() } ?: info.title,
+        currentCid = info.cid,
+        pages = info.pages
+    )
     val playlist by PlaylistManager.playlist.collectAsStateWithLifecycle()
     val playlistIndex by PlaylistManager.currentIndex.collectAsStateWithLifecycle()
     val playMode by PlaylistManager.playMode.collectAsStateWithLifecycle()
@@ -76,6 +115,7 @@ internal fun AudioModeMusicPlayer(
     )
     val lyricsState by lyricsViewModel.uiState.collectAsStateWithLifecycle()
     var showCollectionSheet by remember { mutableStateOf(false) }
+    var showPageSelector by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
 
     val metadataDurationMs = info.pages
@@ -84,14 +124,17 @@ internal fun AudioModeMusicPlayer(
         ?.times(1_000L)
         ?: 0L
     val lyricsDurationMs = playback.durationMs.takeIf { it > 0L } ?: metadataDurationMs
+    val lyricMetadata = remember(displayTitle, info.owner.name) {
+        resolveAudioModeLyricMetadata(displayTitle, info.owner.name)
+    }
 
     LaunchedEffect(Unit) {
         lyricsViewModel.initPlayer(context)
     }
     LaunchedEffect(info.bvid, info.cid, displayTitle, info.owner.name, lyricsDurationMs) {
         lyricsViewModel.loadLyricsForVideo(
-            title = displayTitle,
-            artist = info.owner.name,
+            title = lyricMetadata.title,
+            artist = lyricMetadata.artist,
             bvid = info.bvid,
             cid = info.cid,
             durationMs = lyricsDurationMs
@@ -161,13 +204,38 @@ internal fun AudioModeMusicPlayer(
         onLyricsSearch = lyricsViewModel::searchLyrics,
         onLyricsCandidateSelected = lyricsViewModel::selectLyricsCandidate,
         onVideoModeClick = { onVideoModeClick(info.bvid, info.cid) },
-        onCollectionClick = info.ugc_season?.let { { showCollectionSheet = true } },
+        onCollectionClick = when {
+            info.pages.size > 1 -> ({ showPageSelector = true })
+            info.ugc_season != null -> ({ showCollectionSheet = true })
+            else -> null
+        },
         onSleepTimerClick = { showSleepTimerDialog = true },
         sleepTimerLabel = formatAudioModeSleepTimerButtonLabel(sleepTimerMinutes),
         onPipClick = if (showPipButton) onEnterPip else null,
         isInPipMode = isInPipMode,
         liquidGlassEffectsEnabled = liquidGlassEffectsEnabled
     )
+
+    if (showPageSelector && info.pages.size > 1) {
+        ModalBottomSheet(onDismissRequest = { showPageSelector = false }) {
+            PagesSelector(
+                pages = info.pages,
+                currentPageIndex = info.pages.indexOfFirst { it.cid == info.cid }.coerceAtLeast(0),
+                forceGridMode = true,
+                onDismissRequest = { showPageSelector = false },
+                onPageSelect = { index ->
+                    info.pages.getOrNull(index)?.let { page ->
+                        showPageSelector = false
+                        viewModel.loadVideo(
+                            bvid = info.bvid,
+                            cid = page.cid,
+                            autoPlay = resolveAudioModePageSwitchAutoPlay()
+                        )
+                    }
+                }
+            )
+        }
+    }
 
     info.ugc_season?.let { season ->
         if (showCollectionSheet) {

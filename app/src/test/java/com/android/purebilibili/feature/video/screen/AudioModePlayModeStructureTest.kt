@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.android.purebilibili.data.model.response.Page
 
 class AudioModePlayModeStructureTest {
 
@@ -59,6 +60,38 @@ class AudioModePlayModeStructureTest {
             source.contains("autoPlay = resolveAudioModePageSwitchAutoPlay()"),
             "队列选择应显式恢复播放"
         )
+    }
+
+    @Test
+    fun multiPageAudioModeUsesCurrentPartForLyricsMatching() {
+        val pages = listOf(
+            Page(cid = 11L, page = 1, part = "001. 海屿你 - 马也_Crabbit"),
+            Page(cid = 22L, page = 2, part = "002. 如果可以 - 韦礼安")
+        )
+
+        assertTrue(
+            resolveAudioModeTrackTitle(
+                videoTitle = "2026网络最好听100首热门歌曲",
+                currentCid = 11L,
+                pages = pages
+            ) == "001. 海屿你 - 马也_Crabbit"
+        )
+        val metadata = resolveAudioModeLyricMetadata(
+            trackTitle = "001. 海屿你 - 马也_Crabbit",
+            fallbackArtist = "那首你最爱的歌谣啊"
+        )
+        assertTrue(metadata.title == "海屿你")
+        assertTrue(metadata.artist == "马也_Crabbit")
+    }
+
+    @Test
+    fun multiPageAudioModeExposesPageSelectorAndAutoplaysSelection() {
+        val source = audioModePlayerSource()
+
+        assertTrue(source.contains("info.pages.size > 1"))
+        assertTrue(source.contains("PagesSelector("))
+        assertTrue(source.contains("cid = page.cid"))
+        assertTrue(source.contains("autoPlay = resolveAudioModePageSwitchAutoPlay()"))
     }
 
     private fun audioModePlayerSource(): String = loadSource(

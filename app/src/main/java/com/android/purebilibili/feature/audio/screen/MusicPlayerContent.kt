@@ -367,7 +367,7 @@ internal fun MusicPlayerContent(
                 }
             }
             onCollectionClick?.let { action ->
-                MusicActionSheetItem("视频合集") {
+                MusicActionSheetItem("选集 / 合集") {
                     showActions = false
                     action()
                 }
