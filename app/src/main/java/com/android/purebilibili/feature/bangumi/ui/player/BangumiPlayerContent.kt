@@ -37,6 +37,8 @@ import com.android.purebilibili.feature.video.ui.components.SubReplySheet
 import com.android.purebilibili.feature.video.viewmodel.VideoCommentViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 /**
  * 番剧播放内容区域
@@ -54,6 +56,7 @@ fun BangumiPlayerContent(
     val tabs = listOf("简介", "评论 ${detail.stat?.reply?.takeIf { it > 0L } ?: ""}".trim())
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val scope = rememberCoroutineScope()
+    val selectionBackdrop = rememberLayerBackdrop()
     val subReplyState by commentViewModel.subReplyState.collectAsStateWithLifecycle()
     val commentState by commentViewModel.commentState.collectAsStateWithLifecycle()
 
@@ -74,13 +77,16 @@ fun BangumiPlayerContent(
                 height = 44.dp,
                 indicatorHeight = 30.dp,
                 labelFontSize = 15.sp,
+                backdrop = selectionBackdrop,
                 tapPressRefractionEnabled = false,
             )
         }
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .layerBackdrop(selectionBackdrop)
         ) { page ->
             when (page) {
                 0 -> LazyColumn(

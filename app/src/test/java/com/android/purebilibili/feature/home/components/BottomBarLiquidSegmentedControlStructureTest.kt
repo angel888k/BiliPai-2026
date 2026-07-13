@@ -225,9 +225,9 @@ class BottomBarLiquidSegmentedControlStructureTest {
     }
 
     @Test
-    fun `android native inline segmented control avoids liquid pill when global glass is enabled`() {
+    fun `global glass overrides inline segmented control preference`() {
         assertEquals(
-            SegmentedControlChromeStyle.ANDROID_NATIVE_UNDERLINE,
+            SegmentedControlChromeStyle.LIQUID_PILL,
             resolveSegmentedControlChromeStyle(
                 uiPreset = UiPreset.MD3,
                 androidNativeLiquidGlassEnabled = true,

@@ -107,7 +107,7 @@ internal fun resolveSegmentedControlChromeStyle(
     androidNativeLiquidGlassEnabled: Boolean,
     preferInlineContentStyle: Boolean = false
 ): SegmentedControlChromeStyle {
-    return if (uiPreset == UiPreset.MD3 && (preferInlineContentStyle || !androidNativeLiquidGlassEnabled)) {
+    return if (uiPreset == UiPreset.MD3 && !androidNativeLiquidGlassEnabled) {
         SegmentedControlChromeStyle.ANDROID_NATIVE_UNDERLINE
     } else {
         SegmentedControlChromeStyle.LIQUID_PILL

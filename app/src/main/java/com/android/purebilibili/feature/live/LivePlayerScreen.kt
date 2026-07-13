@@ -83,6 +83,8 @@ import com.android.purebilibili.feature.live.components.LiveReportDialog
 import com.android.purebilibili.feature.live.components.LiveSendDanmakuSheet
 import com.android.purebilibili.feature.live.components.LiveSuperChatSection
 import com.android.purebilibili.feature.home.components.BottomBarLiquidSegmentedControl
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.android.purebilibili.feature.video.player.shouldContinuePlaybackDuringPause
 import com.android.purebilibili.feature.video.state.isPlaybackActiveForLifecycle
 import com.android.purebilibili.feature.video.state.shouldResumeAfterLifecyclePause
@@ -1573,6 +1575,7 @@ private fun LivePrimaryInteractionPanel(
     val tabs = remember { listOf("聊天", "SC") }
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val scope = rememberCoroutineScope()
+    val selectionBackdrop = rememberLayerBackdrop()
 
     LaunchedEffect(selectedTab) {
         val target = selectedTab.coerceIn(0, tabs.lastIndex)
@@ -1606,12 +1609,15 @@ private fun LivePrimaryInteractionPanel(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                labelFontSize = segmentedSpec.labelFontSizeSp.sp
+                labelFontSize = segmentedSpec.labelFontSizeSp.sp,
+                backdrop = selectionBackdrop
             )
         }
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .layerBackdrop(selectionBackdrop)
         ) { page ->
             when (page) {
                 0 -> Box(modifier = Modifier.fillMaxSize()) { chatContent() }
