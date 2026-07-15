@@ -524,11 +524,18 @@ fun VideoContentSection(
             }
     }
 
-    // 采样层只挂在 Tab 页滚动内容上；排序栏/顶栏分段控件必须在捕获区外，避免 drawBackdrop 自引用导致 RenderThread 栈溢出。
+    // Backdrop source must cover every chrome consumer in window coordinates while staying
+    // outside the glass subtree itself; otherwise Miuix samples transparent black out of bounds.
     val videoContentChromeBackdrop = rememberLayerBackdrop()
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .layerBackdrop(videoContentChromeBackdrop)
+        )
         // Inline 弹幕设置不是 Dialog，必须在详情内容之后绘制，避免被列表盖住。
         Column(
             modifier = Modifier.fillMaxSize()
@@ -562,7 +569,6 @@ fun VideoContentSection(
                     0 -> VideoIntroTab(
                         listState = introListState,
                         modifier = Modifier,
-                        chromeBackdrop = videoContentChromeBackdrop,
                         info = info,
                         relatedVideos = relatedVideos,
                         currentPageIndex = currentPageIndex,
@@ -778,21 +784,12 @@ private fun VideoIntroTab(
     onlineCount: String = "",
     showOnlineCount: Boolean = true,
     showInteractionActions: Boolean = true,
-    animateVideoDetailLayout: Boolean = true,
-    chromeBackdrop: LayerBackdrop? = null
+    animateVideoDetailLayout: Boolean = true
 ) {
     val hasPages = info.pages.size > 1
     LazyColumn(
         state = listState,
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (chromeBackdrop != null) {
-                    Modifier.layerBackdrop(chromeBackdrop)
-                } else {
-                    Modifier
-                }
-            ),
+        modifier = modifier.fillMaxSize(),
         contentPadding = contentPadding
     ) {
         // 1. 移入的 Header 区域
@@ -987,15 +984,7 @@ private fun VideoCommentTab(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (chromeBackdrop != null) {
-                            Modifier.layerBackdrop(chromeBackdrop)
-                        } else {
-                            Modifier
-                        }
-                    ),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = contentPadding
             ) {
             if (isRepliesLoading && replies.isEmpty()) {
@@ -1475,6 +1464,7 @@ private fun VideoContentTabBar(
                 indicatorHeight = liquidChromeSpec.segmentedControlIndicatorHeightDp.dp,
                 labelFontSize = liquidChromeSpec.labelFontSizeSp.sp,
                 backdrop = backdrop,
+                backdropCoversControl = backdrop != null,
                 forceLiquidChrome = homeSettings.androidNativeLiquidGlassEnabled,
                 liquidGlassEffectsEnabled = liquidChromeSpec.liquidGlassEffectsEnabled,
                 // Avoid extra press refraction in this compact in-content chrome.

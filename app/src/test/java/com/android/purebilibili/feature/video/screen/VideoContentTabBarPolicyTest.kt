@@ -98,13 +98,16 @@ class VideoContentTabBarPolicyTest {
         )
 
         assertTrue(source.contains("val videoContentChromeBackdrop = rememberLayerBackdrop()"))
+        assertTrue(source.contains(".background(MaterialTheme.colorScheme.surface)"))
+        assertTrue(source.contains(".layerBackdrop(videoContentChromeBackdrop)"))
         assertTrue(source.contains("chromeBackdrop = videoContentChromeBackdrop"))
         assertTrue(source.contains("backdrop = videoContentChromeBackdrop"))
         assertTrue(source.contains("backdrop = chromeBackdrop"))
+        assertTrue(source.contains("backdropCoversControl = backdrop != null"))
         assertTrue(source.contains("Column(modifier = modifier.fillMaxSize())"))
         assertTrue(
             source.contains(
-                "采样层只挂在 Tab 页滚动内容上；排序栏/顶栏分段控件必须在捕获区外"
+                "Backdrop source must cover every chrome consumer in window coordinates"
             )
         )
         val commentTabSource = source.substringAfter("private fun VideoCommentTab(")

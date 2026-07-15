@@ -198,14 +198,10 @@ internal fun shouldDrawSegmentedControlExportCaptureBackdrop(
 /**
  * Sample source for [KernelSuMiuixBottomBarIndicatorLayer] under BILIPAI_TUNED.
  *
- * The indicator samples [contentBackdrop] only. Match TopBar / v9.9.7:
- * prefer export capture with a stable surface fill under monochrome glyphs.
+ * The indicator samples [contentBackdrop] only. A window-aligned page capture supplies
+ * the real background and the transparent export capture adds tinted labels above it.
+ * A page capture that does not cover the consumer must not be passed as [pageBackdrop].
  *
- * Combined(page, export) is unsafe for in-content chrome: the page LayerBackdrop
- * often does not cover the capsule (list starts below the tab strip), and Miuix
- * paints those OOB samples solid black. Export-only with surface fill avoids that.
- *
- * [useCombined] remains for floating dock / full-screen page backdrops only.
  * [combinedBackdrop] must be pre-built via [rememberCombinedBackdrop] when used.
  */
 internal fun resolveLiquidReuseIndicatorContentBackdrop(
@@ -217,22 +213,20 @@ internal fun resolveLiquidReuseIndicatorContentBackdrop(
     if (useCombined && pageBackdrop != null && exportBackdrop != null && combinedBackdrop != null) {
         return combinedBackdrop
     }
-    // Export-only (surface-filled) is the safe BILIPAI / top-tab sample source.
+    // Export remains the fallback for callers that cannot supply a covering page capture.
     if (exportBackdrop != null) return exportBackdrop
     if (pageBackdrop != null) return pageBackdrop
     return null
 }
 
 /**
- * Generic in-content chrome cannot assume a coordinate-dependent capture overlaps its bounds.
- * Miuix draws an out-of-bounds [top.yukonga.miuix.kmp.blur.LayerBackdrop] sample as black, which
- * happens when a tab bar samples a list that starts below it. Screen-aligned home chrome keeps its
- * dedicated sampling path; generic reuse falls back to its coordinate-aligned stable surface.
+ * Selects the real page capture when the caller has verified that its producer covers the
+ * consumer in window coordinates; otherwise callers pass `null` and use the stable fallback.
  */
 internal fun resolveInContentLiquidSamplingBackdrop(
     pageBackdrop: Backdrop?,
     fallbackBackdrop: Backdrop?,
-): Backdrop? = pageBackdrop?.takeUnless { it.isCoordinatesDependent } ?: fallbackBackdrop
+): Backdrop? = pageBackdrop ?: fallbackBackdrop
 
 internal fun resolveSegmentedControlMotionProgress(
     pressProgress: Float,
@@ -349,17 +343,6 @@ internal fun resolveLiquidReuseIndicatorLensSpec(
     indicatorHeightDp: Float,
     chromeContext: LiquidReuseChromeContext = LiquidReuseChromeContext.IN_CONTENT_SEGMENTED,
 ): BottomBarBackdropPresetLensSpec {
-    // A segmented control only owns a local backdrop. During the shared 88/56 drag
-    // magnification Miuix evaluates the indicator lens after scaling; its vertical
-    // samples can then leave that local RenderNode and are filled with solid black.
-    // Keep the bottom-bar geometry/stretch, but reserve indicator refraction for
-    // surfaces backed by a continuous page/dock capture.
-    if (chromeContext == LiquidReuseChromeContext.IN_CONTENT_SEGMENTED) {
-        return BottomBarBackdropPresetLensSpec(
-            refractionHeightDp = 0f,
-            refractionAmountDp = 0f,
-        )
-    }
     val (maxHeight, maxAmount) = resolveLiquidReuseLensDistanceCaps(chromeContext)
     return resolveLiquidReuseLensSpec(
         baseHeightDp = 10f,
@@ -512,6 +495,8 @@ fun BottomBarLiquidSegmentedControl(
     forceLiquidChrome: Boolean = false,
     /** External page [LayerBackdrop] (Miuix). Required for real liquid refraction. */
     backdrop: Backdrop? = null,
+    /** True only when [backdrop]'s producer covers this control in window coordinates. */
+    backdropCoversControl: Boolean = false,
     tapPressRefractionEnabled: Boolean = true,
     containerColorOverride: Color? = null,
     selectedTextColorOverride: Color? = null,
@@ -591,7 +576,7 @@ fun BottomBarLiquidSegmentedControl(
     })
     val samplingBackdrop = if (liquidGlassEnabled) {
         resolveInContentLiquidSamplingBackdrop(
-            pageBackdrop = backdrop,
+            pageBackdrop = backdrop.takeIf { backdropCoversControl },
             fallbackBackdrop = localSamplingBackdrop,
         )
     } else {
@@ -771,27 +756,23 @@ fun BottomBarLiquidSegmentedControl(
         }
         val panelOffsetPx = presetPanelOffsets.indicatorPanelOffsetPx
         val exportPanelOffsetPx = presetPanelOffsets.exportPanelOffsetPx
-        // Export capture (v9.9.7 contentBackdrop = tabs). Surface fill under glyphs so Miuix
-        // never samples empty/transparent export as solid black. Capture extent matches local
-        // bleed so 88/56 capsule scale still samples surface, not OOB black.
-        val tabsBackdrop = rememberLayerBackdrop(onDraw = {
-            drawRect(localSamplingSurfaceColor)
-            drawContent()
-        })
+        // Transparent label export is composited above the real page/fallback capture.
+        // Expanded bounds keep the moving label capture available during 88/56 scaling.
+        val tabsBackdrop = rememberLayerBackdrop()
         // Never self-draw tabsBackdrop on the same node that records it.
-        // Combined stays for the non-BILIPAI backdrop param only — contentBackdrop is export.
-        val hasExternalBackdrop = samplingBackdrop != null
+        val hasExternalBackdrop = backdropCoversControl && backdrop != null
         val combinedIndicatorBackdrop = if (samplingBackdrop != null) {
             rememberCombinedBackdrop(samplingBackdrop, tabsBackdrop)
         } else {
             null
         }
-        // Match TopBar: BILIPAI samples export only. Page Combined OOB-blacks when the
-        // list/page LayerBackdrop does not cover this in-content strip.
+        // Keep the real page capture underneath the transparent label export. Miuix aligns
+        // coordinate-dependent LayerBackdrops in window space, so callers must attach the
+        // supplied backdrop to a sibling background that covers this control's bounds.
         val indicatorContentBackdrop = resolveLiquidReuseIndicatorContentBackdrop(
             pageBackdrop = samplingBackdrop,
             exportBackdrop = tabsBackdrop,
-            useCombined = false,
+            useCombined = true,
             combinedBackdrop = combinedIndicatorBackdrop,
         ) ?: tabsBackdrop
         val captureLensProgress = resolveSharedLiquidIndicatorCaptureLensProgress(

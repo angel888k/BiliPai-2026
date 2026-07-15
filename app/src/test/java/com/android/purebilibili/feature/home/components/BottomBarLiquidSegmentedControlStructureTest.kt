@@ -141,7 +141,7 @@ class BottomBarLiquidSegmentedControlStructureTest {
     }
 
     @Test
-    fun `in-content reuse disables unsafe indicator refraction outside local backdrop`() {
+    fun `in-content reuse keeps indicator refraction inside aligned backdrop`() {
         val capture = resolveLiquidReuseCaptureLensSpec(
             progress = 1f,
             indicatorHeightDp = 56f,
@@ -163,8 +163,16 @@ class BottomBarLiquidSegmentedControlStructureTest {
             capture.refractionAmountDp,
             absoluteTolerance = 0.001f
         )
-        assertEquals(0f, indicator.refractionHeightDp, absoluteTolerance = 0.001f)
-        assertEquals(0f, indicator.refractionAmountDp, absoluteTolerance = 0.001f)
+        assertEquals(
+            LIQUID_REUSE_IN_CONTENT_MAX_REFRACTION_HEIGHT_DP,
+            indicator.refractionHeightDp,
+            absoluteTolerance = 0.001f
+        )
+        assertEquals(
+            LIQUID_REUSE_IN_CONTENT_MAX_REFRACTION_AMOUNT_DP,
+            indicator.refractionAmountDp,
+            absoluteTolerance = 0.001f
+        )
         assertTrue(capture.refractionAmountDp <= LIQUID_REUSE_LOCAL_SAMPLING_BLEED_DP)
         assertTrue(indicator.refractionAmountDp <= LIQUID_REUSE_LOCAL_SAMPLING_BLEED_DP)
         assertFalse(shouldDrawLiquidReuseShellLens(LiquidReuseChromeContext.IN_CONTENT_SEGMENTED))
@@ -388,8 +396,8 @@ class BottomBarLiquidSegmentedControlStructureTest {
         assertTrue(source.contains("rememberCombinedBackdrop("))
         assertTrue(source.contains("resolveLiquidReuseIndicatorContentBackdrop("))
         assertTrue(source.contains("contentBackdrop = indicatorContentBackdrop"))
-        // In-content BILIPAI samples export only (TopBar / v9.9.7); Combined is not content.
-        assertTrue(source.contains("useCombined = false"))
+        // Real page capture stays below the transparent label export.
+        assertTrue(source.contains("useCombined = true"))
         assertTrue(source.contains("backdrop = combinedIndicatorBackdrop ?: samplingBackdrop"))
         assertFalse(source.contains("backdrop ?: tabsBackdrop"))
         assertFalse(source.contains("containerBackdrop = backdrop ?: tabsBackdrop"))
@@ -439,10 +447,12 @@ class BottomBarLiquidSegmentedControlStructureTest {
         assertFalse(source.contains("resolveIosFloatingBottomIndicatorTintAlpha("))
         assertFalse(source.contains("resolveLiquidSegmentedIndicatorColor("))
         assertTrue(source.contains("liquidGlassEffectsEnabled: Boolean = true"))
+        assertTrue(source.contains("backdropCoversControl: Boolean = false"))
+        assertTrue(source.contains("pageBackdrop = backdrop.takeIf { backdropCoversControl }"))
         assertTrue(source.contains("dragSelectionEnabled: Boolean = true"))
         assertFalse(source.contains("shellBackdrop"))
         assertFalse(source.contains("miuixBackdrop:"))
-        assertTrue(source.contains("val tabsBackdrop = rememberLayerBackdrop(onDraw = {"))
+        assertTrue(source.contains("val tabsBackdrop = rememberLayerBackdrop()"))
         assertTrue(source.contains(".layerBackdrop(tabsBackdrop)"))
         assertTrue(source.contains("val exportTintColor = resolveAndroidNativeExportTintColor("))
         assertTrue(source.contains(".graphicsLayer(colorFilter = ColorFilter.tint(exportTintColor))"))

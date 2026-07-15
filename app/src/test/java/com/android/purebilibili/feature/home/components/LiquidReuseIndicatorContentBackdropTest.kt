@@ -48,9 +48,9 @@ class LiquidReuseIndicatorContentBackdropTest {
     }
 
     @Test
-    fun inContentReuseFallsBackWhenPageBackdropDoesNotOverlap() {
+    fun inContentReuseKeepsCoordinateDependentPageBackdropForWindowAlignedSampling() {
         assertSame(
-            ExportBackdrop,
+            CoordinateDependentPageBackdrop,
             resolveInContentLiquidSamplingBackdrop(
                 pageBackdrop = CoordinateDependentPageBackdrop,
                 fallbackBackdrop = ExportBackdrop,
