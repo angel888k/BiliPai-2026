@@ -265,17 +265,24 @@ internal fun resolveLiquidReuseLensStrengthScale(
 }
 
 /**
- * In-content local LayerBackdrop only covers the control (+ bleed). Sample offsets
- * beyond that record region paint solid black in Miuix — keep amount inside bleed.
+ * Local / export LayerBackdrop capture expands by this bleed on each side.
+ * Sample offsets past the recorded region paint solid black in Miuix.
  *
- * Bleed must cover indicator drag-scale (88/56 ≈ +28.5% per side on a full-width
- * capsule) plus refraction amount; 12dp was insufficient and showed black lobes.
+ * Must cover indicator drag-scale (88/56 ≈ +28.5% per side on a full-width capsule)
+ * plus refraction amount and panel offset. Export used to be control-sized only,
+ * so scaled capsules OOB-sampled black on the pill edge (video tab black lobes).
  */
 internal const val LIQUID_REUSE_LOCAL_SAMPLING_BLEED_DP = 40f
 internal const val LIQUID_REUSE_IN_CONTENT_MAX_REFRACTION_HEIGHT_DP = 6f
 internal const val LIQUID_REUSE_IN_CONTENT_MAX_REFRACTION_AMOUNT_DP = 4f
 internal const val LIQUID_REUSE_TOP_TAB_MAX_REFRACTION_HEIGHT_DP = 16f
 internal const val LIQUID_REUSE_TOP_TAB_MAX_REFRACTION_AMOUNT_DP = 10f
+
+/** Expanded capture size: control measure + bleed on every edge. */
+internal fun resolveLiquidReuseCaptureExtentDp(
+    controlSizeDp: Float,
+    bleedDp: Float = LIQUID_REUSE_LOCAL_SAMPLING_BLEED_DP,
+): Float = (controlSizeDp + bleedDp * 2f).coerceAtLeast(controlSizeDp.coerceAtLeast(0f))
 
 /**
  * Caps for [resolveLiquidReuseLensSpec] so page chrome does not OOB-sample black.
@@ -636,22 +643,24 @@ fun BottomBarLiquidSegmentedControl(
             )
             .height(height)
     ) {
+        val controlWidth = maxWidth
+        val controlHeight = height
+        val captureWidth = resolveLiquidReuseCaptureExtentDp(controlWidth.value).dp
+        val captureHeight = resolveLiquidReuseCaptureExtentDp(controlHeight.value).dp
         if (liquidGlassEnabled) {
-            // Expand capture beyond the control so edge lens offsets sample surface fill,
-            // not out-of-bounds black (Miuix LayerBackdrop OOB default).
-            val samplingBleed = LIQUID_REUSE_LOCAL_SAMPLING_BLEED_DP.dp
+            // Local shell sampling: surface fill beyond the control so edge blur never OOB-blacks.
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(maxWidth + samplingBleed * 2)
-                    .height(height + samplingBleed * 2)
+                    .width(captureWidth)
+                    .height(captureHeight)
                     .clearAndSetSemantics {}
                     .layerBackdrop(localSamplingBackdrop)
             )
         }
         val contentPadding = containerHorizontalPadding
         val contentVerticalInset = containerVerticalPadding
-        val slotWidth = (maxWidth - (contentPadding * 2)) / itemCount
+        val slotWidth = (controlWidth - (contentPadding * 2)) / itemCount
         val indicatorWidth = resolveSegmentedControlIndicatorWidthDp(
             slotWidthDp = slotWidth.value,
             indicatorHeightDp = indicatorHeight.value,
@@ -672,7 +681,7 @@ fun BottomBarLiquidSegmentedControl(
             contentPaddingDp = contentPadding.value
         ).dp
         val itemWidthPx = with(density) { slotWidth.toPx() }.coerceAtLeast(1f)
-        val dockWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+        val dockWidthPx = with(density) { controlWidth.toPx() }.coerceAtLeast(1f)
         // Match home bottom bar: drag anywhere on the dock, not only from the capsule.
         val dragModifier = if (enabled && itemCount > 1 && dragSelectionEnabled) {
             Modifier.horizontalDragGesture(
@@ -752,7 +761,8 @@ fun BottomBarLiquidSegmentedControl(
         val panelOffsetPx = presetPanelOffsets.indicatorPanelOffsetPx
         val exportPanelOffsetPx = presetPanelOffsets.exportPanelOffsetPx
         // Export capture (v9.9.7 contentBackdrop = tabs). Surface fill under glyphs so Miuix
-        // never samples empty/transparent export as solid black.
+        // never samples empty/transparent export as solid black. Capture extent matches local
+        // bleed so 88/56 capsule scale still samples surface, not OOB black.
         val tabsBackdrop = rememberLayerBackdrop(onDraw = {
             drawRect(localSamplingSurfaceColor)
             drawContent()
@@ -837,72 +847,89 @@ fun BottomBarLiquidSegmentedControl(
                 .graphicsLayer { translationX = panelOffsetPx }
         )
 
-        // 2) Hidden export capture: monochrome glyphs, theme tint on content only (not backdrop).
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clearAndSetSemantics {}
-                .alpha(0f)
-                .layerBackdrop(tabsBackdrop)
-                .graphicsLayer { translationX = exportPanelOffsetPx }
-                .run {
-                    if (
-                        shouldDrawSegmentedControlExportCaptureBackdrop(
-                            liquidGlassEnabled = liquidGlassEnabled,
-                            hasExternalBackdrop = hasExternalBackdrop
-                        ) && samplingBackdrop != null
-                    ) {
-                        drawBackdrop(
-                            backdrop = samplingBackdrop,
-                            shape = { containerShape },
-                            effects = {
-                                // Match KernelSu bottom-bar export capture: vibrancy + blur +
-                                // edge lens only (no depth/dispersion). Top/bottom bands carry
-                                // the vertical refraction that the capsule samples after drag scale.
-                                vibrancy()
-                                blur(4.dp.toPx(), 4.dp.toPx())
-                                if (captureLensProgress > 0.001f) {
-                                    lens(
-                                        refractionHeight = captureLensSpec.refractionHeightDp.dp.toPx(),
-                                        refractionAmount = captureLensSpec.refractionAmountDp.dp.toPx(),
-                                    )
-                                }
-                            },
-                            onDrawSurface = {
-                                drawRect(
-                                    resolveLiquidReuseExportSurfaceColor(
-                                        shellContainerColor = containerColor,
-                                        chromeContext = liquidReuseChrome,
-                                    )
-                                )
-                            }
-                        )
-                    } else {
-                        this
-                    }
-                }
-        ) {
-            BottomBarLiquidSegmentedLabels(
-                items = items,
-                selectedIndex = safeSelectedIndex,
-                indicatorPosition = indicatorPosition,
-                motionProgress = motionProgress,
-                selectionEmphasis = refractionMotionProfile.exportSelectionEmphasis,
-                // Match bottom bar export: neutral glyphs then SrcIn-tint to primary.
-                selectedTextColor = exportMonochromeColor,
-                unselectedTextColor = exportMonochromeColor,
-                enabled = enabled,
-                labelFontSize = labelFontSize,
-                indicatorCorner = indicatorCorner,
-                onSelected = onSelected,
-                interactive = false,
-                applyItemScale = true,
-                forceUnselectedColor = false,
+        // 2) Hidden export capture: expanded LayerBackdrop + centered control content.
+        // Capsule samples this export; bleed must match local so drag-scale never OOB-blacks.
+        if (liquidGlassEnabled) {
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = contentPadding, vertical = contentVerticalInset)
-                    .graphicsLayer(colorFilter = ColorFilter.tint(exportTintColor))
-            )
+                    .align(Alignment.Center)
+                    .width(captureWidth)
+                    .height(captureHeight)
+                    .clearAndSetSemantics {}
+                    .alpha(0f)
+                    .layerBackdrop(tabsBackdrop)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .width(controlWidth)
+                        .height(controlHeight)
+                        .graphicsLayer { translationX = exportPanelOffsetPx }
+                        .run {
+                            // In-content export stays surface-filled only. Re-sampling page/list
+                            // into export reintroduces OOB black under monochrome glyphs.
+                            // Local stable surface is already painted by tabsBackdrop.onDraw.
+                            if (
+                                shouldDrawSegmentedControlExportCaptureBackdrop(
+                                    liquidGlassEnabled = liquidGlassEnabled,
+                                    hasExternalBackdrop = hasExternalBackdrop
+                                ) &&
+                                samplingBackdrop != null &&
+                                // Only composite an extra shell tint when we have a non-local page
+                                // sample that is known safe (coordinate-independent).
+                                samplingBackdrop !== localSamplingBackdrop &&
+                                !samplingBackdrop.isCoordinatesDependent
+                            ) {
+                                drawBackdrop(
+                                    backdrop = samplingBackdrop,
+                                    shape = { containerShape },
+                                    effects = {
+                                        vibrancy()
+                                        blur(4.dp.toPx(), 4.dp.toPx())
+                                        if (captureLensProgress > 0.001f) {
+                                            lens(
+                                                refractionHeight = captureLensSpec.refractionHeightDp.dp.toPx(),
+                                                refractionAmount = captureLensSpec.refractionAmountDp.dp.toPx(),
+                                            )
+                                        }
+                                    },
+                                    onDrawSurface = {
+                                        drawRect(
+                                            resolveLiquidReuseExportSurfaceColor(
+                                                shellContainerColor = containerColor,
+                                                chromeContext = liquidReuseChrome,
+                                            )
+                                        )
+                                    }
+                                )
+                            } else {
+                                this
+                            }
+                        }
+                ) {
+                    BottomBarLiquidSegmentedLabels(
+                        items = items,
+                        selectedIndex = safeSelectedIndex,
+                        indicatorPosition = indicatorPosition,
+                        motionProgress = motionProgress,
+                        selectionEmphasis = refractionMotionProfile.exportSelectionEmphasis,
+                        // Match bottom bar export: neutral glyphs then SrcIn-tint to primary.
+                        selectedTextColor = exportMonochromeColor,
+                        unselectedTextColor = exportMonochromeColor,
+                        enabled = enabled,
+                        labelFontSize = labelFontSize,
+                        indicatorCorner = indicatorCorner,
+                        onSelected = onSelected,
+                        interactive = false,
+                        applyItemScale = true,
+                        forceUnselectedColor = false,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = contentPadding, vertical = contentVerticalInset)
+                            .graphicsLayer(colorFilter = ColorFilter.tint(exportTintColor))
+                    )
+                }
+            }
         }
 
         // 3) Capsule on top — samples export theme glyphs through glass (Miuix only).

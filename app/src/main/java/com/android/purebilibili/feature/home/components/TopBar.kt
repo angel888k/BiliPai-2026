@@ -1247,69 +1247,97 @@ private fun LightweightHomeTopTabs(
                         .graphicsLayer { translationX = topTabContentPanelOffsetPx }
                 ) {
                 // Hidden monochrome export row: theme tint → pure primary under glass.
+                // Expand LayerBackdrop by reuse bleed so 88/56 capsule scale never OOB-blacks.
                 if (shouldPrimeTopTabLiquidGlassCapture) {
-                    Box(
+                    BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxSize()
                             .clearAndSetSemantics {}
                             .alpha(0f)
                             .zIndex(0f)
-                            .layerBackdrop(topTabContentBackdrop)
-                            .graphicsLayer {
-                                // Only mirror LazyRow content origin (padding - scroll). No extra panel offset.
-                                translationX = topTabHorizontalPaddingPx - topTabListScrollOffsetPx
-                            }
-                            .run {
-                                if (backdrop != null && shouldUseLiquidGlassIndicator) {
-                                    drawBackdrop(
-                                        backdrop = backdrop,
-                                        shape = { resolveSharedBottomBarCapsuleShape() },
-                                        effects = {
-                                            // Dock export capture: edge lens only (no depth/dispersion).
-                                            vibrancy()
-                                            blur(4.dp.toPx(), 4.dp.toPx())
-                                            if (topTabCaptureLensProgress > 0.001f) {
-                                                lens(
-                                                    refractionHeight = topTabCaptureLensSpec.refractionHeightDp.dp.toPx(),
-                                                    refractionAmount = topTabCaptureLensSpec.refractionAmountDp.dp.toPx(),
-                                                )
-                                            }
-                                        }
-                                    )
-                                } else {
-                                    this
-                                }
-                            },
-                        contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
+                        val tabCaptureWidth = maxWidth
+                        val tabCaptureHeight = maxHeight
+                        val exportCaptureWidth =
+                            resolveLiquidReuseCaptureExtentDp(tabCaptureWidth.value).dp
+                        val exportCaptureHeight =
+                            resolveLiquidReuseCaptureExtentDp(tabCaptureHeight.value).dp
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .width(exportCaptureWidth)
+                                .height(exportCaptureHeight)
+                                .layerBackdrop(topTabContentBackdrop)
                         ) {
-                            categories.forEachIndexed { index, category ->
-                                val categoryKey = categoryKeys.getOrNull(index) ?: category
-                                LightweightTopTabItem(
-                                    renderer = effectiveRenderer,
-                                    category = category,
-                                    categoryKey = categoryKey,
-                                    index = index,
-                                    selectionFraction = 1f,
-                                    selectedIndex = selectedIndex,
-                                    showIcon = showIcon,
-                                    showText = showText,
-                                    itemWidth = itemWidth,
-                                    skinPlainStyle = false,
-                                    drawContainer = false,
-                                    skinIconPaths = null,
-                                    hasSkinStickerIcon = false,
-                                    useClickIndication = false,
-                                    colorMode = TopTabLiquidColorMode.GLASS_EXPORT,
-                                    exportMonochromeColor = topTabExportMonochromeColor,
-                                    modifier = Modifier.graphicsLayer(
-                                        colorFilter = ColorFilter.tint(topTabExportTintColor)
-                                    ),
-                                    onClick = {}
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .width(tabCaptureWidth)
+                                    .height(tabCaptureHeight)
+                                    .graphicsLayer {
+                                        // Only mirror LazyRow content origin (padding - scroll).
+                                        translationX =
+                                            topTabHorizontalPaddingPx - topTabListScrollOffsetPx
+                                    }
+                                    .run {
+                                        // Never re-sample a coordinate-dependent page LayerBackdrop
+                                        // into export — OOB paints black under monochrome glyphs.
+                                        // Surface fill from topTabContentBackdrop.onDraw is enough.
+                                        if (
+                                            backdrop != null &&
+                                            shouldUseLiquidGlassIndicator &&
+                                            !backdrop.isCoordinatesDependent
+                                        ) {
+                                            drawBackdrop(
+                                                backdrop = backdrop,
+                                                shape = { resolveSharedBottomBarCapsuleShape() },
+                                                effects = {
+                                                    vibrancy()
+                                                    blur(4.dp.toPx(), 4.dp.toPx())
+                                                    if (topTabCaptureLensProgress > 0.001f) {
+                                                        lens(
+                                                            refractionHeight = topTabCaptureLensSpec.refractionHeightDp.dp.toPx(),
+                                                            refractionAmount = topTabCaptureLensSpec.refractionAmountDp.dp.toPx(),
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                        } else {
+                                            this
+                                        }
+                                    },
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Start
+                                ) {
+                                    categories.forEachIndexed { index, category ->
+                                        val categoryKey = categoryKeys.getOrNull(index) ?: category
+                                        LightweightTopTabItem(
+                                            renderer = effectiveRenderer,
+                                            category = category,
+                                            categoryKey = categoryKey,
+                                            index = index,
+                                            selectionFraction = 1f,
+                                            selectedIndex = selectedIndex,
+                                            showIcon = showIcon,
+                                            showText = showText,
+                                            itemWidth = itemWidth,
+                                            skinPlainStyle = false,
+                                            drawContainer = false,
+                                            skinIconPaths = null,
+                                            hasSkinStickerIcon = false,
+                                            useClickIndication = false,
+                                            colorMode = TopTabLiquidColorMode.GLASS_EXPORT,
+                                            exportMonochromeColor = topTabExportMonochromeColor,
+                                            modifier = Modifier.graphicsLayer(
+                                                colorFilter = ColorFilter.tint(topTabExportTintColor)
+                                            ),
+                                            onClick = {}
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

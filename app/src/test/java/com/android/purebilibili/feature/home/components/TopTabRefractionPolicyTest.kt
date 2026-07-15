@@ -390,6 +390,9 @@ class TopTabRefractionPolicyTest {
         assertTrue(source.contains("rememberCombinedBackdrop(backdrop, topTabContentBackdrop)"))
         assertTrue(source.contains("if (shouldPrimeTopTabLiquidGlassCapture)"))
         assertTrue(source.contains("layerBackdrop(topTabContentBackdrop)"))
+        // Export capture expands with reuse bleed; skip coordinate-dependent page re-sample.
+        assertTrue(source.contains("resolveLiquidReuseCaptureExtentDp("))
+        assertTrue(source.contains("!backdrop.isCoordinatesDependent"))
         assertFalse(source.contains("com.kyant.backdrop"))
     }
 
