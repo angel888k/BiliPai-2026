@@ -155,26 +155,51 @@ class VideoDetailReturnCoverPolicyTest {
     }
 
     @Test
-    fun `predictive exit alone does not switch detail into returning visual state`() {
+    fun `idle detail does not use returning visual without exit or force cover`() {
         assertFalse(
             shouldUseReturningVideoDetailVisualState(
-                forceCoverOnlyForReturn = false
+                forceCoverOnlyForReturn = false,
+                isCardReturnExitInProgress = false,
             )
         )
     }
 
     @Test
-    fun `explicit return state switches detail into returning visual state`() {
+    fun `committed card return exit enables cover handoff without forceCoverOnly`() {
+        // PostExit + sharedBounds → 叠封面淡出 surface，但不 forceCoverOnly 拆 player bounds
         assertTrue(
             shouldUseReturningVideoDetailVisualState(
-                forceCoverOnlyForReturn = true
+                forceCoverOnlyForReturn = false,
+                isCardReturnExitInProgress = true,
             )
         )
         assertFalse(
-            shouldUseReturningVideoDetailVisualState(
-                forceCoverOnlyForReturn = false
+            resolveForceCoverOnlyForReturn(
+                forceCoverOnlyOnReturn = false,
+                isCardReturnExitInProgress = true,
             )
         )
+    }
+
+    @Test
+    fun `explicit force cover still switches detail into returning visual state`() {
+        assertTrue(
+            shouldUseReturningVideoDetailVisualState(
+                forceCoverOnlyForReturn = true,
+                isCardReturnExitInProgress = false,
+            )
+        )
+    }
+
+    @Test
+    fun `returning visual is wired from card exit progress for handoff`() {
+        val source = File("src/main/java/com/android/purebilibili/feature/video/screen/VideoDetailScreen.kt")
+            .readText()
+        val call = source
+            .substringAfter("val useReturningVideoDetailVisualState = shouldUseReturningVideoDetailVisualState(")
+            .substringBefore(")")
+        assertTrue(call.contains("isCardReturnExitInProgress = isCardReturnExitInProgress"))
+        assertTrue(call.contains("forceCoverOnlyForReturn = forceCoverOnlyForReturn"))
     }
 
     @Test

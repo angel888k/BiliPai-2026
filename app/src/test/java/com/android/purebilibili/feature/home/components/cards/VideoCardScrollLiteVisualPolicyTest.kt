@@ -114,16 +114,19 @@ class VideoCardScrollLiteVisualPolicyTest {
     }
 
     @Test
-    fun `cover stats participate in video metadata shared bounds`() {
+    fun `cover stats do not claim separate shared bounds when shell owns morph`() {
+        // CARD_SHELL 容器已接管共享元素；封面上的播放量/弹幕不再挂独立 sharedBounds，
+        // 避免与 shell morph / 冻结景深叠层抢 key。
         val source = File("src/main/java/com/android/purebilibili/feature/home/components/cards/VideoCard.kt")
             .readText()
         val coverStatsBlock = source
             .substringAfter("if (scrollLitePolicy.showCompactStatsOnCover) {")
             .substringBefore("//  时长标签")
 
-        assertTrue(coverStatsBlock.contains("videoViewsSharedElementKey"))
-        assertTrue(coverStatsBlock.contains("videoDanmakuSharedElementKey"))
-        assertTrue(coverStatsBlock.contains("sharedBounds("))
+        assertTrue(coverStatsBlock.contains("BoxWithConstraints("))
+        assertFalse(coverStatsBlock.contains("videoViewsSharedElementKey"))
+        assertFalse(coverStatsBlock.contains("sharedBounds("))
+        assertTrue(source.contains("videoCardShellSharedBoundsOrEmpty("))
     }
 
     @Test
@@ -194,18 +197,9 @@ class VideoCardScrollLiteVisualPolicyTest {
     }
 
     @Test
-    fun homeCardCover_hiddenDuringShellEnterMorphOnly() {
+    fun homeCardCover_hiddenForOpeningFreezeAndActiveShellMorph() {
+        // OPENING：不依赖 isTransitionActive，保证冻结层 record 时封面已透明
         assertTrue(
-            shouldHideHomeCardCoverDuringShellMorph(
-                useCardContainerSharedBounds = true,
-                isSharedMorphSourceCard = true,
-                isReturningFromDetail = false,
-                isSharedTransitionActive = true,
-                transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.OPENING,
-                isVideoCardReturnGestureInProgress = false,
-            )
-        )
-        assertFalse(
             shouldHideHomeCardCoverDuringShellMorph(
                 useCardContainerSharedBounds = true,
                 isSharedMorphSourceCard = true,
@@ -215,44 +209,48 @@ class VideoCardScrollLiteVisualPolicyTest {
                 isVideoCardReturnGestureInProgress = false,
             )
         )
-        assertFalse(
+        // shared morph 进行中（含返回）：overlay 独占
+        assertTrue(
             shouldHideHomeCardCoverDuringShellMorph(
                 useCardContainerSharedBounds = true,
                 isSharedMorphSourceCard = true,
                 isReturningFromDetail = true,
                 isSharedTransitionActive = true,
-                transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.OPENING,
+                transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.RETURNING,
                 isVideoCardReturnGestureInProgress = false,
             )
         )
-        assertFalse(
+        // 预测返回手势
+        assertTrue(
             shouldHideHomeCardCoverDuringShellMorph(
                 useCardContainerSharedBounds = true,
                 isSharedMorphSourceCard = true,
                 isReturningFromDetail = false,
-                isSharedTransitionActive = true,
+                isSharedTransitionActive = false,
                 transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.HELD,
-                isVideoCardReturnGestureInProgress = false,
+                isVideoCardReturnGestureInProgress = true,
             )
         )
+        // morph 结束：显示封面承接落位
         assertFalse(
             shouldHideHomeCardCoverDuringShellMorph(
                 useCardContainerSharedBounds = true,
                 isSharedMorphSourceCard = true,
-                isReturningFromDetail = false,
-                isSharedTransitionActive = true,
+                isReturningFromDetail = true,
+                isSharedTransitionActive = false,
                 transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.IDLE,
                 isVideoCardReturnGestureInProgress = false,
             )
         )
+        // 非源卡 / 未启用 shell：不隐藏
         assertFalse(
             shouldHideHomeCardCoverDuringShellMorph(
                 useCardContainerSharedBounds = true,
-                isSharedMorphSourceCard = true,
+                isSharedMorphSourceCard = false,
                 isReturningFromDetail = false,
                 isSharedTransitionActive = true,
                 transitionBackgroundPhase = VideoCardTransitionBackgroundPhase.OPENING,
-                isVideoCardReturnGestureInProgress = true,
+                isVideoCardReturnGestureInProgress = false,
             )
         )
     }

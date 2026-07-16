@@ -297,10 +297,18 @@ internal fun resolveForceCoverOnlyForReturn(
     return forceCoverOnlyOnReturn
 }
 
+/**
+ * 返回视觉（封面叠层 + 播放器淡出）：
+ * - 显式 forceCoverOnly
+ * - 或已提交的卡片回收退出（PostExit + sharedBounds）——末段 handoff，避免 surface→列表封面闪帧
+ *
+ * 注意：不把预测拖动中（未 PostExit）算进来，拖动仍保持 live player。
+ */
 internal fun shouldUseReturningVideoDetailVisualState(
-    forceCoverOnlyForReturn: Boolean
+    forceCoverOnlyForReturn: Boolean,
+    isCardReturnExitInProgress: Boolean = false,
 ): Boolean {
-    return forceCoverOnlyForReturn
+    return forceCoverOnlyForReturn || isCardReturnExitInProgress
 }
 
 internal fun shouldTreatVideoDetailCardExitAsReturning(
@@ -1893,8 +1901,11 @@ fun VideoDetailScreen(
         transitionEnabled = transitionEnabled,
         isCardReturnExitInProgress = isCardReturnExitInProgress
     )
+    // 提交返回后的 PostExit：叠已缓存封面并淡出 surface，但不 forceCoverOnly
+    //（保留 shell/player 容器参与 sharedBounds，避免 key 被拆掉）。
     val useReturningVideoDetailVisualState = shouldUseReturningVideoDetailVisualState(
-        forceCoverOnlyForReturn = forceCoverOnlyForReturn
+        forceCoverOnlyForReturn = forceCoverOnlyForReturn,
+        isCardReturnExitInProgress = isCardReturnExitInProgress,
     )
 
     val handleTopBarAction = remember(

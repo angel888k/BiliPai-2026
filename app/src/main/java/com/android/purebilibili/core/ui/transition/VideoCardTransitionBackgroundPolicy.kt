@@ -451,8 +451,11 @@ internal fun Modifier.videoCardTransitionBackgroundEffect(
         }
         when (phase) {
             VideoCardTransitionBackgroundPhase.OPENING -> {
-                // 允许至少一帧完整 record，再冻结，避免空 layer。
+                // 多等 1～2 帧：首页源卡封面在 OPENING 已 alpha=0，再 record 可减少
+                // 「冻结层清晰封面 + shared overlay」双重渲染。
                 snapshotState.freezeRecording = false
+                snapshotState.hasRecordedContent = false
+                withFrameNanos { }
                 withFrameNanos { }
                 if (!snapshotState.hasRecordedContent) {
                     withFrameNanos { }
