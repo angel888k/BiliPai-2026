@@ -10,8 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import com.android.purebilibili.core.ui.AdaptiveScaffold
 import com.android.purebilibili.core.ui.AdaptiveTopAppBar
 import com.android.purebilibili.core.ui.rememberAppBackIcon
@@ -45,13 +50,37 @@ fun WebViewScreen(
     onMusicClick: ((musicId: String) -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
+    val sessionState = rememberSaveable(saver = WebViewSessionState.Saver) {
+        WebViewSessionState()
+    }
+    val webHistoryBackState = rememberNavigationEventState(NavigationEventInfo.None)
+    val latestOnVideoClick = rememberUpdatedState(onVideoClick)
+    val latestOnSpaceClick = rememberUpdatedState(onSpaceClick)
+    val latestOnLiveClick = rememberUpdatedState(onLiveClick)
+    val latestOnDynamicClick = rememberUpdatedState(onDynamicClick)
+    val latestOnBangumiClick = rememberUpdatedState(onBangumiClick)
+    val latestOnMusicClick = rememberUpdatedState(onMusicClick)
+
+    NavigationBackHandler(
+        state = webHistoryBackState,
+        isBackEnabled = sessionState.canGoBack,
+        reportPredictiveProgress = false,
+        onBackCancelled = { commitTransition ->
+            sessionState.cancelBackGesture()
+            commitTransition()
+        },
+        onBackCompleted = { commitTransition ->
+            sessionState.dispatchBack(onBack)
+            commitTransition()
+        },
+    )
 
     AdaptiveScaffold(
         topBar = {
             AdaptiveTopAppBar(
                 title = title ?: "浏览器",
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { sessionState.dispatchBack(onBack) }) {
                         Icon(rememberAppBackIcon(), contentDescription = "Back")
                     }
                 },
@@ -79,6 +108,20 @@ fun WebViewScreen(
                         
                         // [核心] 自定义 WebViewClient 拦截 Bilibili 链接
                         webViewClient = object : WebViewClient() {
+                            override fun doUpdateVisitedHistory(
+                                view: WebView?,
+                                url: String?,
+                                isReload: Boolean,
+                            ) {
+                                super.doUpdateVisitedHistory(view, url, isReload)
+                                sessionState.updateHistory(view)
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                sessionState.updateHistory(view)
+                            }
+
                             override fun shouldOverrideUrlLoading(
                                 view: WebView?,
                                 request: WebResourceRequest?
@@ -124,38 +167,38 @@ fun WebViewScreen(
                                     fun dispatchTarget(target: BilibiliNavigationTarget): Boolean {
                                         return when (target) {
                                             is BilibiliNavigationTarget.Video -> {
-                                                onVideoClick?.invoke(target.videoId)
-                                                onVideoClick != null
+                                                latestOnVideoClick.value?.invoke(target.videoId)
+                                                latestOnVideoClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.Space -> {
-                                                onSpaceClick?.invoke(target.mid)
-                                                onSpaceClick != null
+                                                latestOnSpaceClick.value?.invoke(target.mid)
+                                                latestOnSpaceClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.Live -> {
-                                                onLiveClick?.invoke(target.roomId)
-                                                onLiveClick != null
+                                                latestOnLiveClick.value?.invoke(target.roomId)
+                                                latestOnLiveClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.BangumiSeason -> {
-                                                onBangumiClick?.invoke(target.seasonId, 0)
-                                                onBangumiClick != null
+                                                latestOnBangumiClick.value?.invoke(target.seasonId, 0)
+                                                latestOnBangumiClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.BangumiEpisode -> {
-                                                onBangumiClick?.invoke(0, target.epId)
-                                                onBangumiClick != null
+                                                latestOnBangumiClick.value?.invoke(0, target.epId)
+                                                latestOnBangumiClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.Music -> {
-                                                onMusicClick?.invoke(target.musicId)
-                                                onMusicClick != null
+                                                latestOnMusicClick.value?.invoke(target.musicId)
+                                                latestOnMusicClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.Dynamic -> {
-                                                onDynamicClick?.invoke(target.dynamicId)
-                                                onDynamicClick != null
+                                                latestOnDynamicClick.value?.invoke(target.dynamicId)
+                                                latestOnDynamicClick.value != null
                                             }
 
                                             is BilibiliNavigationTarget.Search -> false
@@ -209,16 +252,15 @@ fun WebViewScreen(
                                 return false // 不拦截，继续加载
                             }
                         }
-                        
-                        loadUrl(url)
+
+                        sessionState.attach(this)
+                        sessionState.requestRoute(this, url)
                     }
                 },
                 update = { webView ->
-                    // Avoid reloading on recomposition if URL hasn't changed
-                    if (webView.url != url) {
-                        webView.loadUrl(url)
-                    }
+                    sessionState.requestRoute(webView, url)
                 },
+                onRelease = sessionState::release,
                 modifier = Modifier.fillMaxSize()
             )
         }
