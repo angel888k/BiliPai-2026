@@ -43,20 +43,13 @@ jobs:
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
 
-      # 逐条列出当前可通过的测试类；shape/motion/surface 三条历史债继续由 allowlist
-      # 棘轮限制不能增长。颜色、间距、字号和已迁移模块检查在 PR 阶段直接执行。
-      - name: 帧预算与稳定性棘轮
+      # PerfGuard 只验证会直接影响帧时间、GPU 合成或运行时降级策略的断言。
+      # 架构迁移、DataStore key 所有权和样式规范有不同的失败语义，不能伪装成性能
+      # 回归并阻断不相关 PR；它们应由对应的专项检查处理。
+      - name: 帧预算与运行时视觉守卫
         run: |
           ./gradlew :app:testDebugUnitTest \
             --tests 'com.android.purebilibili.core.ui.perf.FrameBudgetLintTest' \
-            --tests 'com.android.purebilibili.data.model.ModelImmutabilityGuardTest' \
-            --tests 'com.android.purebilibili.core.ui.lint.HardcodedColorLintTest' \
-            --tests 'com.android.purebilibili.core.ui.lint.HardcodedSpacingLintTest' \
-            --tests 'com.android.purebilibili.core.ui.lint.HardcodedTypographyLintTest' \
-            --tests 'com.android.purebilibili.core.ui.lint.MigratedFeatureStyleLintTest' \
-            --tests 'com.android.purebilibili.core.ui.lint.StyleLintAllowlistRatchetTest' \
-            --tests 'com.android.purebilibili.core.store.SettingsManagerSizeRatchetTest' \
-            --tests 'com.android.purebilibili.core.store.PreferenceKeyUniquenessTest' \
             --tests 'com.android.purebilibili.core.ui.performance.*' \
             --tests 'com.android.purebilibili.core.ui.adaptive.RuntimeVisualGuard*'
 
